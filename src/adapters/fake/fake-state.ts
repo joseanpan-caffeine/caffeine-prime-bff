@@ -33,132 +33,157 @@ export interface FakeAccount {
   birthDate?: string;
 }
 
-const IMG = 'https://cdn.shopify.com/s/files/1/0000/0000/products';
+/** Base pública padrão (mesma do `PUBLIC_BASE_URL` em `config/env.ts`). */
+export const DEFAULT_PUBLIC_BASE_URL = 'http://localhost:3333';
 
-export const FAKE_CATALOG: Catalog = {
-  plans: [
-    {
-      frequency: 'Mensal',
-      name: 'Prime Mensal',
-      commitmentMonths: 0,
-      discountPercentage: 10,
-      pauseCredits: 0,
-    },
-    {
-      frequency: 'Trimestral',
-      name: 'Prime Trimestral',
-      commitmentMonths: 3,
-      discountPercentage: 15,
-      pauseCredits: 0,
-    },
-    {
-      frequency: 'Semestral',
-      name: 'Prime Semestral',
-      commitmentMonths: 6,
-      discountPercentage: 20,
-      pauseCredits: 1,
-    },
-    {
-      frequency: 'Anual',
-      name: 'Prime Anual',
-      commitmentMonths: 12,
-      discountPercentage: 25,
-      pauseCredits: 2,
-      highlight: 'Mais vantajoso',
-    },
-  ],
-  products: [
-    {
-      handle: 'supercoffee-3-0-380g',
-      title: 'Supercoffee 3.0 380g',
-      category: 'Super Coffee',
-      imageUrl: `${IMG}/supercoffee-380g.png`,
-      price: brl(144.9),
-      flavors: [
-        { handle: 'supercoffee-3-0-original-380g', title: 'Original', inStock: true },
-        { handle: 'supercoffee-3-0-chocolate-380g', title: 'Chocolate', inStock: true },
-        { handle: 'supercoffee-3-0-vanilla-380g', title: 'Vanilla', inStock: true },
-        { handle: 'supercoffee-3-0-paçoca-380g', title: 'Paçoca', inStock: false },
-      ],
-      inStock: true,
-      minQuantity: 1,
-      maxQuantity: 6,
-    },
-    {
-      handle: 'supercoffee-3-0-economic',
-      title: 'Supercoffee 3.0 Economic (2x220g)',
-      category: 'Super Coffee',
-      imageUrl: `${IMG}/supercoffee-economic.png`,
-      price: brl(216.9),
-      flavors: [
-        { handle: 'supercoffee-3-0-original-economic', title: 'Original', inStock: true },
-        { handle: 'supercoffee-3-0-chocolate-economic', title: 'Chocolate', inStock: true },
-        { handle: 'supercoffee-3-0-vanilla-economic', title: 'Vanilla', inStock: true },
-      ],
-      inStock: true,
-      minQuantity: 1,
-      maxQuantity: 4,
-    },
-    {
-      handle: 'supercoffee-to-go',
-      title: 'Supercoffee To Go (10 sachês)',
-      category: 'Super Coffee',
-      imageUrl: `${IMG}/supercoffee-to-go.png`,
-      price: brl(40.65),
-      inStock: true,
-      minQuantity: 1,
-      maxQuantity: 10,
-    },
-    {
-      handle: 'morning-shot',
-      title: 'Morning Shot',
-      category: 'Suplementos',
-      imageUrl: `${IMG}/morning-shot.png`,
-      price: brl(89.9),
-      inStock: true,
-      minQuantity: 1,
-      maxQuantity: 4,
-    },
-    {
-      handle: 'creatine-300g',
-      title: 'Creatine Caffeine Army 300g',
-      category: 'Suplementos',
-      imageUrl: `${IMG}/creatine.png`,
-      price: brl(119.9),
-      inStock: true,
-      minQuantity: 1,
-      maxQuantity: 4,
-    },
-    {
-      handle: 'whey-isolado-900g',
-      title: 'Whey Protein Isolado 900g',
-      category: 'Suplementos',
-      imageUrl: `${IMG}/whey.png`,
-      price: brl(189.9),
-      flavors: [
-        { handle: 'whey-isolado-chocolate-900g', title: 'Chocolate', inStock: true },
-        { handle: 'whey-isolado-baunilha-900g', title: 'Baunilha', inStock: true },
-      ],
-      inStock: true,
-      minQuantity: 1,
-      maxQuantity: 3,
-    },
-  ],
-  discountTiers: [
-    { minItems: 1, discountPercentage: 0, label: '1 item' },
-    { minItems: 3, discountPercentage: 27, label: '3+ itens' },
-    { minItems: 5, discountPercentage: 30, label: '5+ itens' },
-  ],
-  gifts: [
-    {
-      handle: 'copo-termico-prime',
-      title: 'Copo Térmico Prime',
-      imageUrl: `${IMG}/copo.png`,
-      requiresPlan: ['Anual'],
-    },
-    { handle: 'kit-saches', title: 'Kit de Sachês Supercoffee', imageUrl: `${IMG}/kit-saches.png` },
-  ],
-};
+/**
+ * Monta o catálogo fake apontando as imagens para os arquivos reais servidos pelo
+ * próprio BFF em `/static/products` (pasta `public/`). Produtos sem imagem local
+ * ficam sem `imageUrl` e o app exibe um placeholder — nunca URLs de CDN inventadas.
+ */
+export function buildFakeCatalog(publicBaseUrl: string = DEFAULT_PUBLIC_BASE_URL): Catalog {
+  const IMG = `${publicBaseUrl.replace(/\/+$/, '')}/static/products`;
+  return {
+    plans: [
+      {
+        frequency: 'Mensal',
+        name: 'Prime Mensal',
+        commitmentMonths: 0,
+        discountPercentage: 10,
+        pauseCredits: 0,
+      },
+      {
+        frequency: 'Trimestral',
+        name: 'Prime Trimestral',
+        commitmentMonths: 3,
+        discountPercentage: 15,
+        pauseCredits: 0,
+      },
+      {
+        frequency: 'Semestral',
+        name: 'Prime Semestral',
+        commitmentMonths: 6,
+        discountPercentage: 20,
+        pauseCredits: 1,
+      },
+      {
+        frequency: 'Anual',
+        name: 'Prime Anual',
+        commitmentMonths: 12,
+        discountPercentage: 25,
+        pauseCredits: 2,
+        highlight: 'Mais vantajoso',
+      },
+    ],
+    products: [
+      {
+        handle: 'supercoffee-3-0-380g',
+        title: 'Supercoffee 3.0 380g',
+        category: 'Super Coffee',
+        imageUrl: `${IMG}/supercoffee-380g.png`,
+        price: brl(144.9),
+        flavors: [
+          { handle: 'supercoffee-3-0-original-380g', title: 'Original', inStock: true },
+          { handle: 'supercoffee-3-0-chocolate-380g', title: 'Chocolate', inStock: true },
+          { handle: 'supercoffee-3-0-vanilla-380g', title: 'Vanilla', inStock: true },
+          { handle: 'supercoffee-3-0-paçoca-380g', title: 'Paçoca', inStock: false },
+        ],
+        inStock: true,
+        minQuantity: 1,
+        maxQuantity: 6,
+      },
+      {
+        handle: 'supercoffee-3-0-economic',
+        title: 'Supercoffee 3.0 Economic (2x220g)',
+        category: 'Super Coffee',
+        imageUrl: `${IMG}/supercoffee-economic.png`,
+        price: brl(216.9),
+        flavors: [
+          { handle: 'supercoffee-3-0-original-economic', title: 'Original', inStock: true },
+          { handle: 'supercoffee-3-0-chocolate-economic', title: 'Chocolate', inStock: true },
+          { handle: 'supercoffee-3-0-vanilla-economic', title: 'Vanilla', inStock: true },
+        ],
+        inStock: true,
+        minQuantity: 1,
+        maxQuantity: 4,
+      },
+      {
+        handle: 'supercoffee-to-go',
+        title: 'Supercoffee To Go (10 sachês)',
+        category: 'Super Coffee',
+        imageUrl: `${IMG}/supercoffee-to-go.png`,
+        price: brl(40.65),
+        inStock: true,
+        minQuantity: 1,
+        maxQuantity: 10,
+      },
+      {
+        handle: 'morning-shot',
+        title: 'Morning Shot',
+        category: 'Suplementos',
+        imageUrl: `${IMG}/morning-shot.png`,
+        price: brl(89.9),
+        inStock: true,
+        minQuantity: 1,
+        maxQuantity: 4,
+      },
+      {
+        handle: 'creatine-300g',
+        title: 'Creatine Caffeine Army 300g',
+        category: 'Suplementos',
+        price: brl(119.9),
+        inStock: true,
+        minQuantity: 1,
+        maxQuantity: 4,
+      },
+      {
+        handle: 'whey-isolado-900g',
+        title: 'Whey Protein Isolado 900g',
+        category: 'Suplementos',
+        imageUrl: `${IMG}/whey.png`,
+        price: brl(189.9),
+        flavors: [
+          { handle: 'whey-isolado-chocolate-900g', title: 'Chocolate', inStock: true },
+          { handle: 'whey-isolado-baunilha-900g', title: 'Baunilha', inStock: true },
+        ],
+        inStock: true,
+        minQuantity: 1,
+        maxQuantity: 3,
+      },
+    ],
+    discountTiers: [
+      { minItems: 1, discountPercentage: 0, label: '1 item' },
+      { minItems: 3, discountPercentage: 27, label: '3+ itens' },
+      { minItems: 5, discountPercentage: 30, label: '5+ itens' },
+    ],
+    gifts: [
+      {
+        handle: 'copo-termico-prime',
+        title: 'Copo Térmico Prime',
+        requiresPlan: ['Anual'],
+      },
+      { handle: 'kit-saches', title: 'Kit de Sachês Supercoffee' },
+    ],
+  };
+}
+
+/** Catálogo fake com a base pública padrão (usado em testes unitários). */
+export const FAKE_CATALOG: Catalog = buildFakeCatalog();
+
+/**
+ * Imagens por sabor (o contrato `Catalog.products[].flavors` não tem `imageUrl`,
+ * então o item da caixa recebe a imagem do sabor por aqui). Sabores sem arquivo
+ * próprio herdam a imagem do produto.
+ */
+export function buildFakeFlavorImages(
+  publicBaseUrl: string = DEFAULT_PUBLIC_BASE_URL,
+): Record<string, string> {
+  const IMG = `${publicBaseUrl.replace(/\/+$/, '')}/static/products`;
+  return {
+    'supercoffee-3-0-chocolate-380g': `${IMG}/supercoffee-chocolate-380g.png`,
+    'supercoffee-3-0-vanilla-380g': `${IMG}/supercoffee-vanilla-380g.png`,
+  };
+}
 
 export const FAKE_COUPONS: Coupon[] = [
   { code: 'PRIME10', percentage: 10, temporaryCycles: 3 },
@@ -197,14 +222,12 @@ export const FAKE_BANNERS: Banner[] = [
     id: 'bn-1',
     title: 'Prime Week',
     subtitle: 'Brindes exclusivos para assinantes Anual',
-    imageUrl: `${IMG}/banner-prime-week.png`,
     deepLink: 'caffeineprime://box/gifts',
   },
   {
     id: 'bn-2',
     title: 'Novo sabor: Paçoca',
     subtitle: 'Chegando em breve na sua caixa',
-    imageUrl: `${IMG}/banner-pacoca.png`,
     deepLink: 'caffeineprime://box/edit',
   },
 ];
@@ -230,12 +253,19 @@ export class FakeState {
   magicLinks = new Map<string, { email: string; expiresAt: Date }>();
   /** external_id (Estoca/Shopify order) e trackingCode → fatura */
   orderRefs = new Map<string, FakeOrderRef>();
-  catalog: Catalog = FAKE_CATALOG;
+  catalog: Catalog;
+  /** handle do sabor → imagem (ver `buildFakeFlavorImages`) */
+  flavorImages: Record<string, string>;
   coupons: Coupon[] = FAKE_COUPONS;
   private nextCustomerId = 7100;
   private nextBillSeq = 1;
 
-  constructor(public readonly seededAt: Date = new Date()) {
+  constructor(
+    public readonly seededAt: Date = new Date(),
+    publicBaseUrl: string = DEFAULT_PUBLIC_BASE_URL,
+  ) {
+    this.catalog = buildFakeCatalog(publicBaseUrl);
+    this.flavorImages = buildFakeFlavorImages(publicBaseUrl);
     this.seed(seededAt);
   }
 
@@ -283,7 +313,7 @@ export class FakeState {
       handle: seed.handle,
       title: flavor ? `${product.title} ${flavor.title}` : product.title,
       ...(flavor ? { flavor: flavor.title } : {}),
-      imageUrl: product.imageUrl,
+      imageUrl: this.flavorImages[seed.handle] ?? product.imageUrl,
       sku: `SKU-${seed.handle.toUpperCase().slice(0, 18)}`,
       quantity: seed.quantity,
       price: product.price,

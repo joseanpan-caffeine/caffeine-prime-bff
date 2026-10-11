@@ -49,9 +49,12 @@ function bool(name: string, fallback: boolean): boolean {
 export function loadEnv() {
   const adapters: AdaptersMode = str('ADAPTERS', 'fake') === 'real' ? 'real' : 'fake';
   const isFake = adapters === 'fake';
+  const port = num('PORT', 3333);
   return {
-    port: num('PORT', 3333),
+    port,
     nodeEnv: str('NODE_ENV', 'development'),
+    // URL pública do BFF, usada para montar links absolutos (ex.: imagens em /static).
+    publicBaseUrl: str('PUBLIC_BASE_URL', `http://localhost:${port}`).replace(/\/+$/, ''),
     adapters,
     isFake,
     // Em desenvolvimento (adaptadores fake) o Expo web local é liberado por padrão.

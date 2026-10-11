@@ -82,7 +82,10 @@ export class AdaptersModule {
     const integrations: Provider[] =
       env.adapters === 'fake'
         ? [
-            { provide: FakeState, useFactory: () => new FakeState(options.seedNow ?? clock.now()) },
+            {
+              provide: FakeState,
+              useFactory: () => new FakeState(options.seedNow ?? clock.now(), env.publicBaseUrl),
+            },
             FakeSubscriptionGateway,
             FakeIdentityProvider,
             FakePaymentGateway,

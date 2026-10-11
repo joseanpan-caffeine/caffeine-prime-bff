@@ -24,8 +24,16 @@ Stores do BFF (sessões, dispositivos, preferências, eventos de webhook, pedido
 | Stores Prisma | `DATABASE_URL` | `npm run prisma:generate` após mudar o schema; `npx prisma migrate dev` para criar as tabelas |
 
 Envs transversais (independem do adaptador): `JWT_SECRET`, `ACCESS_TOKEN_TTL_SECONDS`, `REFRESH_TOKEN_TTL_DAYS`,
-`VINDI_WEBHOOK_SECRET`, `FREIGHT_SERVICE_ACCESS_TOKEN`, `CORS_ORIGINS`, `THROTTLE_DISABLED`, `PORT`.
+`VINDI_WEBHOOK_SECRET`, `FREIGHT_SERVICE_ACCESS_TOKEN`, `CORS_ORIGINS`, `THROTTLE_DISABLED`, `PORT`, `PUBLIC_BASE_URL`.
 Veja `.env.example` para os padrões.
+
+## Arquivos estáticos e imagens do catálogo fake
+
+A pasta `public/` é servida em `/static` (fora do prefixo `/v1`), ex.: `public/products/whey.png` →
+`${PUBLIC_BASE_URL}/static/products/whey.png`. O catálogo fake monta os `imageUrl` com `PUBLIC_BASE_URL`
+(padrão `http://localhost:${PORT}`); ao testar em dispositivo físico/emulador defina o IP da máquina
+(ex.: `PUBLIC_BASE_URL=http://192.168.0.10:3333`). Produtos sem imagem local ficam sem `imageUrl`
+e o app exibe um placeholder — não há URLs de CDN inventadas.
 
 ## Como conectar um adaptador real
 

@@ -16,6 +16,8 @@ COPY package.json package-lock.json ./
 COPY prisma ./prisma
 RUN npm ci --omit=dev --no-audit --no-fund && npm cache clean --force
 COPY --from=build /app/dist ./dist
+# Arquivos estáticos servidos em /static (imagens do catálogo fake)
+COPY public ./public
 USER node
 EXPOSE 3333
 CMD ["node", "dist/main.js"]

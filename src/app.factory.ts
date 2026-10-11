@@ -1,7 +1,9 @@
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
+import { join } from 'node:path';
 import { AdaptersModuleOptions } from './adapters/adapters.module';
 import { AppModule } from './app.module';
 import { Env, loadEnv } from './config/env';
@@ -11,12 +13,19 @@ export async function createApp(
   options: AdaptersModuleOptions = {},
 ): Promise<{ app: INestApplication; env: Env }> {
   const env = options.env ?? loadEnv();
-  const app = await NestFactory.create(AppModule.forRoot({ ...options, env }), {
-    logger: env.nodeEnv === 'test' ? false : undefined,
-  });
+  const app = await NestFactory.create<NestExpressApplication>(
+    AppModule.forRoot({ ...options, env }),
+    { logger: env.nodeEnv === 'test' ? false : undefined },
+  );
 
   app.setGlobalPrefix('v1');
-  app.use(helmet());
+  // Imagens etc. em `public/` servidas em /static (fora do prefixo /v1). O app carrega essas
+  // imagens de outra origem, então o CORP do helmet precisa ser `cross-origin` para elas.
+  app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
+  app.useStaticAssets(join(__dirname, '..', 'public'), {
+    prefix: '/static',
+    maxAge: '1d',
+  });
   // CORS desligado por padrão: o BFF só atende o app nativo. Allowlist via CORS_ORIGINS.
   if (env.corsOrigins.length > 0) {
     app.enableCors({
