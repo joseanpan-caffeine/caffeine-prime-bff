@@ -1,7 +1,34 @@
 /**
  * Leitura centralizada das variáveis de ambiente, com padrões seguros para desenvolvimento.
  */
+import { existsSync, readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+
 export type AdaptersMode = 'fake' | 'real';
+
+/**
+ * Carrega um arquivo .env simples (KEY=VALUE) sem dependência externa.
+ * Variáveis já definidas no ambiente têm prioridade sobre o arquivo.
+ */
+function loadDotEnv(file = resolve(process.cwd(), '.env')): void {
+  if (!existsSync(file)) return;
+  for (const raw of readFileSync(file, 'utf8').split(/\r?\n/)) {
+    const line = raw.trim();
+    if (!line || line.startsWith('#')) continue;
+    const eq = line.indexOf('=');
+    if (eq <= 0) continue;
+    const key = line.slice(0, eq).trim();
+    let value = line.slice(eq + 1).trim();
+    if (
+      (value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    ) {
+      value = value.slice(1, -1);
+    }
+    if (process.env[key] === undefined) process.env[key] = value;
+  }
+}
+loadDotEnv();
 
 function str(name: string, fallback = ''): string {
   const v = process.env[name];
@@ -27,7 +54,11 @@ export function loadEnv() {
     nodeEnv: str('NODE_ENV', 'development'),
     adapters,
     isFake,
-    corsOrigins: str('CORS_ORIGINS')
+    // Em desenvolvimento (adaptadores fake) o Expo web local é liberado por padrão.
+    corsOrigins: str(
+      'CORS_ORIGINS',
+      isFake ? 'http://localhost:8081,http://127.0.0.1:8081,http://localhost:19006' : '',
+    )
       .split(',')
       .map((s) => s.trim())
       .filter(Boolean),
