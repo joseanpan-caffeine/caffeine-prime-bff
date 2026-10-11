@@ -7,7 +7,8 @@ Seleção pela env `ADAPTERS`:
 | `fake` (padrão) | Tudo em memória, 9 contas de `ROUTES.md`, senha `prime123`. Nenhuma env de integração é necessária. |
 | `real` | Classes em `real/` (hoje stubs que lançam `501 NotImplemented` com o endpoint que irão chamar). |
 
-Stores do BFF (sessões, dispositivos, preferências, eventos de webhook, pedidos de exclusão):
+Stores do BFF (sessões, dispositivos, preferências, eventos de webhook, pedidos de exclusão, consentimentos,
+rotina/check-ins, agregados de saúde, conversas do assistente):
 `DATABASE_URL` definido → Prisma/Postgres (`prisma/`); ausente → memória (`fake/memory-stores.ts`).
 
 ## Variáveis por adaptador real
@@ -20,11 +21,16 @@ Stores do BFF (sessões, dispositivos, preferências, eventos de webhook, pedido
 | `ShopifyMetaobjectCatalog` (`CatalogSource`) | `SHOPIFY_STORE_DOMAIN`, `SHOPIFY_ADMIN_ACCESS_TOKEN` | escopo `read_metaobjects`; cache sugerido 10 min |
 | `IntelipostQuoter` (`ShippingQuoter`) | `INTELIPOST_API_URL`, `INTELIPOST_API_KEY` | header `api-key` |
 | `CaffeineXWallet` (`PointsWallet`) | `CAFFEINE_X_BASE_URL`, `CAFFEINE_X_API_KEY` | header `x-api-key` |
-| `ExpoPushSender` (`PushSender`) | `EXPO_PUSH_URL`, `EXPO_ACCESS_TOKEN` | token opcional (Bearer) |
+| `RoutingPushSender` (`PushSender`) → `ExpoPushSender` + `FcmPushSender` | `EXPO_PUSH_URL`, `EXPO_ACCESS_TOKEN`, `FIREBASE_SERVICE_ACCOUNT_JSON` | roteia por `PushTarget.provider` (`expo` → Expo; `fcm`/`apns` → FCM). `FcmPushSender` é stub: falta instalar `firebase-admin` (TODO no arquivo) |
+| `AnthropicAssistantProvider` (`AssistantProvider`) | `ANTHROPIC_API_KEY`, `ASSISTANT_MODEL` (padrão `claude-sonnet-4-5`), `ASSISTANT_MAX_TOKENS` | prompt de sistema e allowlist de deep links em `src/modules/assistant/system-prompt.ts`; sem chave → 503 `ASSISTANT_UNAVAILABLE`. Fake: `FakeAssistantProvider` responde por palavra-chave (pausa, cancelar, sabor, pontos, entrega, cafeína) |
 | Stores Prisma | `DATABASE_URL` | `npm run prisma:generate` após mudar o schema; `npx prisma migrate dev` para criar as tabelas |
 
 Envs transversais (independem do adaptador): `JWT_SECRET`, `ACCESS_TOKEN_TTL_SECONDS`, `REFRESH_TOKEN_TTL_DAYS`,
-`VINDI_WEBHOOK_SECRET`, `FREIGHT_SERVICE_ACCESS_TOKEN`, `CORS_ORIGINS`, `THROTTLE_DISABLED`, `PORT`, `PUBLIC_BASE_URL`.
+`VINDI_WEBHOOK_SECRET`, `FREIGHT_SERVICE_ACCESS_TOKEN`, `CORS_ORIGINS`, `THROTTLE_DISABLED`, `PORT`, `PUBLIC_BASE_URL`,
+`FEATURE_ROUTINE|HEALTH|ASSISTANT`, `CONSENT_VERSION_*`, `ASSISTANT_DAILY_MESSAGE_LIMIT`, `REMINDERS_ENABLED`.
+
+O catálogo (`CatalogSource`) agora também traz `usageHint` e `dosesPerUnit` por produto (metaobjects na Shopify;
+valores fixos só no catálogo fake), usados pelo plano de rotina e pela previsão de estoque.
 Veja `.env.example` para os padrões.
 
 ## Arquivos estáticos e imagens do catálogo fake

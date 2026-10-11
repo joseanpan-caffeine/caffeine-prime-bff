@@ -12,7 +12,7 @@ paths:
   /v1/config:
     get:
       operationId: ConfigController_config
-      summary: Versão mínima, feature flags e links
+      summary: Versão mínima, feature flags, links e versões dos consentimentos
       parameters: []
       responses:
         "200":
@@ -800,6 +800,248 @@ paths:
         "200":
           description: ""
       tags: *a12
+  /v1/me/consents:
+    get:
+      operationId: ConsentController_list
+      summary: Consentimentos do cliente (todos os tipos, com a versão vigente)
+      parameters: []
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ConsentSchema"
+      tags: &a13
+        - consents
+      security: &a14
+        - bearer: []
+    put:
+      operationId: ConsentController_update
+      summary: Concede ou revoga um consentimento na versão vigente
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateConsentDto"
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConsentSchema"
+      tags: *a13
+      security: *a14
+  /v1/me/routine:
+    get:
+      operationId: RoutineController_getPlan
+      summary: Plano de rotina (padrão derivado da caixa quando ainda não editado)
+      parameters: []
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoutinePlanSchema"
+      tags: &a15
+        - routine
+      security: &a16
+        - bearer: []
+    put:
+      operationId: RoutineController_updatePlan
+      summary: Edita itens, horários de lembrete, meta semanal e fuso do plano
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateRoutinePlanDto"
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoutinePlanSchema"
+      tags: *a15
+      security: *a16
+  /v1/me/routine/check-ins:
+    post:
+      operationId: RoutineController_checkIn
+      summary: Marca um item como feito no dia (idempotente por item+data)
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CheckInDto"
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CheckInSchema"
+      tags: *a15
+      security: *a16
+  /v1/me/routine/check-ins/{id}:
+    delete:
+      operationId: RoutineController_removeCheckIn
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        "204":
+          description: ""
+      tags: *a15
+      security: *a16
+  /v1/me/routine/summary:
+    get:
+      operationId: RoutineController_summary
+      summary: Streaks, meta semanal, últimos 28 dias e previsão de estoque
+      parameters:
+        - name: days
+          required: false
+          in: query
+          schema:
+            example: 28
+            type: string
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoutineSummarySchema"
+      tags: *a15
+      security: *a16
+  /v1/me/health/sync:
+    post:
+      operationId: HealthDataController_sync
+      summary: Envia agregados diários (upsert por dia+métrica); nunca séries brutas
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/HealthSyncDto"
+      responses:
+        "204":
+          description: ""
+      tags: &a17
+        - health-data
+      security: &a18
+        - bearer: []
+  /v1/me/health/summary:
+    get:
+      operationId: HealthDataController_summary
+      summary: Últimos 7 dias e sugestões de uso dos produtos (regras, não medicina)
+      parameters: []
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthSummarySchema"
+      tags: *a17
+      security: *a18
+  /v1/assistant/config:
+    get:
+      operationId: AssistantConfigController_config
+      summary: Flag, aviso obrigatório, sugestões e limite diário
+      parameters: []
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AssistantConfigSchema"
+      tags:
+        - assistant
+      security:
+        - bearer: []
+  /v1/me/assistant/threads:
+    get:
+      operationId: AssistantController_listThreads
+      parameters: []
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AssistantThreadSchema"
+      tags: &a19
+        - assistant
+      security: &a20
+        - bearer: []
+  /v1/me/assistant/threads/{id}:
+    get:
+      operationId: AssistantController_getThread
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AssistantThreadSchema"
+      tags: *a19
+      security: *a20
+    delete:
+      operationId: AssistantController_deleteThread
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        "204":
+          description: ""
+      tags: *a19
+      security: *a20
+  /v1/me/assistant/messages:
+    post:
+      operationId: AssistantController_send
+      summary: Envia uma mensagem (nova conversa quando threadId ausente)
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AssistantSendDto"
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AssistantSendResponseSchema"
+      tags: *a19
+      security: *a20
 info:
   title: Caffeine Prime BFF
   description: Backend-for-frontend do app Caffeine Army Prime. Contrato em
@@ -826,6 +1068,8 @@ components:
           type: string
         subscribeUrl:
           type: string
+        healthPrivacy:
+          type: string
       required:
         - privacy
         - terms
@@ -842,10 +1086,16 @@ components:
             type: boolean
         links:
           $ref: "#/components/schemas/AppConfigLinksSchema"
+        consentVersions:
+          type: object
+          additionalProperties:
+            type: string
+          description: Versões vigentes dos termos de consentimento por tipo
       required:
         - minSupportedVersion
         - features
         - links
+        - consentVersions
     UserProfileSchema:
       type: object
       properties:
@@ -1269,7 +1519,7 @@ components:
           type: boolean
         reason:
           type: string
-          enum: &a13
+          enum: &a21
             - EDIT_WINDOW_CLOSED
             - SUBSCRIPTION_NOT_ACTIVE
             - FREQUENCY_NOT_ELIGIBLE
@@ -1299,7 +1549,7 @@ components:
           type: boolean
         reason:
           type: string
-          enum: *a13
+          enum: *a21
         until:
           type: string
           description: Quando reabre (ISO, São Paulo)
@@ -1319,7 +1569,7 @@ components:
           type: boolean
         reason:
           type: string
-          enum: *a13
+          enum: *a21
         until:
           type: string
           description: Quando reabre (ISO, São Paulo)
@@ -1620,6 +1870,12 @@ components:
           type: number
         maxQuantity:
           type: number
+        usageHint:
+          type: string
+          description: Para que serve / como tomar
+        dosesPerUnit:
+          type: number
+          description: Doses por unidade (previsão de estoque)
       required:
         - handle
         - title
@@ -1769,7 +2025,7 @@ components:
       properties:
         frequency:
           type: string
-          enum: &a14
+          enum: &a22
             - Mensal
             - Trimestral
             - Semestral
@@ -1789,7 +2045,7 @@ components:
       properties:
         frequency:
           type: string
-          enum: *a14
+          enum: *a22
         items:
           type: array
           items:
@@ -2019,9 +2275,20 @@ components:
     RegisterDeviceDto:
       type: object
       properties:
-        expoPushToken:
+        pushToken:
           type: string
           example: ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]
+        pushProvider:
+          type: string
+          enum:
+            - expo
+            - fcm
+            - apns
+          description: "padrão: expo"
+        expoPushToken:
+          type: string
+          deprecated: true
+          description: use pushToken
         platform:
           type: string
           enum:
@@ -2033,7 +2300,6 @@ components:
         deviceName:
           type: string
       required:
-        - expoPushToken
         - platform
         - appVersion
     NotificationPreferencesSchema:
@@ -2047,6 +2313,9 @@ components:
           type: boolean
         marketing:
           type: boolean
+        routine:
+          type: boolean
+          description: Lembretes da rotina
       required:
         - billing
         - shipping
@@ -2063,3 +2332,464 @@ components:
           type: boolean
         marketing:
           type: boolean
+        routine:
+          type: boolean
+          description: Lembretes da rotina
+    ConsentSchema:
+      type: object
+      properties:
+        kind:
+          type: string
+          enum:
+            - push
+            - health_data
+            - routine_data
+            - ai_assistant
+            - analytics
+        granted:
+          type: boolean
+        grantedAt:
+          type: string
+        version:
+          type: string
+          example: 2026-10-11
+      required:
+        - kind
+        - granted
+        - version
+    UpdateConsentDto:
+      type: object
+      properties:
+        kind:
+          type: string
+          enum:
+            - push
+            - health_data
+            - routine_data
+            - ai_assistant
+            - analytics
+        granted:
+          type: boolean
+        version:
+          type: string
+          example: 2026-10-11
+          description: versão do termo (AppConfig.consentVersions)
+      required:
+        - kind
+        - granted
+        - version
+    RoutineItemSchema:
+      type: object
+      properties:
+        id:
+          type: string
+        productHandle:
+          type: string
+        title:
+          type: string
+        imageUrl:
+          type: string
+        slot:
+          type: string
+          enum:
+            - morning
+            - pre_workout
+            - afternoon
+            - evening
+        reminderTime:
+          type: string
+          example: 07:30
+        reminderEnabled:
+          type: boolean
+        dosesPerDay:
+          type: number
+        usageHint:
+          type: string
+      required:
+        - id
+        - productHandle
+        - title
+        - slot
+        - reminderEnabled
+        - dosesPerDay
+    RoutinePlanSchema:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/RoutineItemSchema"
+        weeklyGoalDays:
+          type: number
+          minimum: 1
+          maximum: 7
+        timezone:
+          type: string
+          example: America/Sao_Paulo
+      required:
+        - items
+        - weeklyGoalDays
+        - timezone
+    RoutineItemInputDto:
+      type: object
+      properties:
+        id:
+          type: string
+          description: id existente ou novo (o BFF gera se vazio)
+        productHandle:
+          type: string
+          example: supercoffee-3-0-original-380g
+        slot:
+          type: string
+          enum:
+            - morning
+            - pre_workout
+            - afternoon
+            - evening
+        reminderTime:
+          type: string
+          example: 07:30
+        reminderEnabled:
+          type: boolean
+        dosesPerDay:
+          type: number
+          example: 1
+      required:
+        - id
+        - productHandle
+        - slot
+        - reminderEnabled
+        - dosesPerDay
+    UpdateRoutinePlanDto:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/RoutineItemInputDto"
+        weeklyGoalDays:
+          type: number
+          minimum: 1
+          maximum: 7
+        timezone:
+          type: string
+          example: America/Sao_Paulo
+    CheckInSchema:
+      type: object
+      properties:
+        id:
+          type: string
+        routineItemId:
+          type: string
+        date:
+          type: string
+          example: 2026-10-11
+        doneAt:
+          type: string
+        source:
+          type: string
+          enum:
+            - manual
+            - reminder
+            - wearable
+      required:
+        - id
+        - routineItemId
+        - date
+        - doneAt
+        - source
+    CheckInDto:
+      type: object
+      properties:
+        routineItemId:
+          type: string
+        date:
+          type: string
+          example: 2026-10-11
+        source:
+          type: string
+          enum:
+            - manual
+            - reminder
+            - wearable
+      required:
+        - routineItemId
+        - date
+    RoutineTodayItemSchema:
+      type: object
+      properties:
+        routineItemId:
+          type: string
+        done:
+          type: boolean
+      required:
+        - routineItemId
+        - done
+    RoutineTodaySchema:
+      type: object
+      properties:
+        date:
+          type: string
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/RoutineTodayItemSchema"
+        completion:
+          type: number
+          description: 0–1
+      required:
+        - date
+        - items
+        - completion
+    RoutineDaySchema:
+      type: object
+      properties:
+        date:
+          type: string
+        completion:
+          type: number
+          description: 0–1
+      required:
+        - date
+        - completion
+    StockForecastSchema:
+      type: object
+      properties:
+        productHandle:
+          type: string
+        dosesLeft:
+          type: number
+        runsOutAt:
+          type: string
+        nextBoxAt:
+          type: string
+      required:
+        - productHandle
+        - dosesLeft
+    RoutineSummarySchema:
+      type: object
+      properties:
+        today:
+          $ref: "#/components/schemas/RoutineTodaySchema"
+        currentStreakDays:
+          type: number
+        longestStreakDays:
+          type: number
+        weekCompletion:
+          type: number
+          description: 0–1
+        last28Days:
+          type: array
+          items:
+            $ref: "#/components/schemas/RoutineDaySchema"
+        stockForecast:
+          type: array
+          items:
+            $ref: "#/components/schemas/StockForecastSchema"
+      required:
+        - today
+        - currentStreakDays
+        - longestStreakDays
+        - weekCompletion
+        - last28Days
+    HealthDailySampleDto:
+      type: object
+      properties:
+        date:
+          type: string
+          example: 2026-10-11
+        metric:
+          type: string
+          enum:
+            - steps
+            - active_minutes
+            - workouts
+            - sleep_minutes
+            - resting_heart_rate
+            - water_ml
+        value:
+          type: number
+          example: 8200
+        source:
+          type: string
+          example: Apple Watch
+      required:
+        - date
+        - metric
+        - value
+    HealthSyncDto:
+      type: object
+      properties:
+        samples:
+          type: array
+          items:
+            $ref: "#/components/schemas/HealthDailySampleDto"
+        provider:
+          type: string
+          enum:
+            - apple_health
+            - health_connect
+      required:
+        - samples
+    HealthDaySchema:
+      type: object
+      properties:
+        date:
+          type: string
+        steps:
+          type: number
+        activeMinutes:
+          type: number
+        workouts:
+          type: number
+        sleepMinutes:
+          type: number
+      required:
+        - date
+    HealthSuggestionSchema:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        body:
+          type: string
+        productHandle:
+          type: string
+        deepLink:
+          type: string
+      required:
+        - id
+        - title
+        - body
+    HealthSummarySchema:
+      type: object
+      properties:
+        connected:
+          type: boolean
+        provider:
+          type: string
+          enum:
+            - apple_health
+            - health_connect
+            - none
+        lastSyncAt:
+          type: string
+        last7Days:
+          type: array
+          items:
+            $ref: "#/components/schemas/HealthDaySchema"
+        suggestions:
+          type: array
+          items:
+            $ref: "#/components/schemas/HealthSuggestionSchema"
+      required:
+        - connected
+        - last7Days
+        - suggestions
+    AssistantConfigSchema:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+        disclaimer:
+          type: string
+        suggestedPrompts:
+          type: array
+          items:
+            type: string
+        dailyMessageLimit:
+          type: number
+      required:
+        - enabled
+        - disclaimer
+        - suggestedPrompts
+        - dailyMessageLimit
+    AssistantMessageSchema:
+      type: object
+      properties:
+        id:
+          type: string
+        role:
+          type: string
+          enum:
+            - user
+            - assistant
+        content:
+          type: string
+        createdAt:
+          type: string
+      required:
+        - id
+        - role
+        - content
+        - createdAt
+    AssistantThreadSchema:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        messages:
+          description: vazio na listagem
+          type: array
+          items:
+            $ref: "#/components/schemas/AssistantMessageSchema"
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required:
+        - id
+        - messages
+        - createdAt
+        - updatedAt
+    AssistantActionSchema:
+      type: object
+      properties:
+        label:
+          type: string
+        deepLink:
+          type: string
+          example: app://routine
+      required:
+        - label
+        - deepLink
+    AssistantSendResponseSchema:
+      type: object
+      properties:
+        threadId:
+          type: string
+        reply:
+          $ref: "#/components/schemas/AssistantMessageSchema"
+        actions:
+          type: array
+          items:
+            $ref: "#/components/schemas/AssistantActionSchema"
+        disclaimer:
+          type: string
+          description: Presente na primeira resposta de cada conversa
+      required:
+        - threadId
+        - reply
+    AssistantContextDto:
+      type: object
+      properties:
+        screen:
+          type: string
+          example: box
+    AssistantSendDto:
+      type: object
+      properties:
+        threadId:
+          type: string
+          description: ausente = nova conversa
+        message:
+          type: string
+          example: Quando posso pausar?
+        context:
+          $ref: "#/components/schemas/AssistantContextDto"
+      required:
+        - message

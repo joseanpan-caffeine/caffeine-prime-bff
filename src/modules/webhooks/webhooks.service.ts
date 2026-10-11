@@ -13,6 +13,7 @@ import {
   PushSender,
   SUBSCRIPTION_GATEWAY,
   SubscriptionGateway,
+  toPushTargets,
   WEBHOOK_EVENT_STORE,
   WebhookEventStore,
 } from '../../ports';
@@ -148,9 +149,6 @@ export class WebhooksService {
     const prefs = await this.prefs.get(customerId);
     if (!prefs[channel]) return;
     const devices = await this.devices.listByCustomer(customerId);
-    await this.push.send(
-      devices.map((d) => d.expoPushToken),
-      message,
-    );
+    await this.push.send(toPushTargets(devices), message);
   }
 }

@@ -5,6 +5,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
+  ArrayMaxSize,
   ArrayNotEmpty,
   IsArray,
   IsBoolean,
@@ -13,6 +14,7 @@ import {
   IsInt,
   IsISO8601,
   IsNotEmpty,
+  IsNumber,
   IsOptional,
   IsString,
   Length,
@@ -21,6 +23,7 @@ import {
   MaxLength,
   Min,
   MinLength,
+  ValidateIf,
   ValidateNested,
 } from 'class-validator';
 import type * as Api from '../contracts/api';
@@ -202,11 +205,29 @@ export class DeleteRequestDto {
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(500) reason?: string;
 }
 
-export class RegisterDeviceDto implements Api.RegisterDeviceRequest {
-  @ApiProperty({ example: 'ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]' })
+export const PUSH_PROVIDERS = ['expo', 'fcm', 'apns'] as const;
+
+/**
+ * Registro de dispositivo. `pushToken` é o campo atual; `expoPushToken` é alias deprecado (apps
+ * antigos) e, quando é o único enviado, vira `pushToken` com `pushProvider: 'expo'`.
+ */
+export class RegisterDeviceDto {
+  @ApiPropertyOptional({ example: 'ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]' })
+  @ValidateIf((o) => o.expoPushToken === undefined)
   @IsString()
   @IsNotEmpty()
-  expoPushToken: string;
+  @MaxLength(4096)
+  pushToken?: string;
+  @ApiPropertyOptional({ enum: PUSH_PROVIDERS, description: 'padrão: expo' })
+  @IsOptional()
+  @IsIn(PUSH_PROVIDERS as unknown as string[])
+  pushProvider?: Api.RegisterDeviceRequest['pushProvider'];
+  @ApiPropertyOptional({ deprecated: true, description: 'use pushToken' })
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(4096)
+  expoPushToken?: string;
   @ApiProperty({ enum: ['ios', 'android'] }) @IsIn(['ios', 'android']) platform: 'ios' | 'android';
   @ApiProperty({ example: '1.0.0' }) @IsString() @IsNotEmpty() appVersion: string;
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(80) deviceName?: string;
@@ -217,4 +238,154 @@ export class NotificationPreferencesPatchDto implements Partial<Api.Notification
   @ApiPropertyOptional() @IsOptional() @IsBoolean() shipping?: boolean;
   @ApiPropertyOptional() @IsOptional() @IsBoolean() renewal?: boolean;
   @ApiPropertyOptional() @IsOptional() @IsBoolean() marketing?: boolean;
+  @ApiPropertyOptional({ description: 'Lembretes da rotina' })
+  @IsOptional()
+  @IsBoolean()
+  routine?: boolean;
+}
+
+// ---------- Consentimentos ----------
+
+export const CONSENT_KINDS: Api.ConsentKind[] = [
+  'push',
+  'health_data',
+  'routine_data',
+  'ai_assistant',
+  'analytics',
+];
+
+export class UpdateConsentDto implements Api.UpdateConsentRequest {
+  @ApiProperty({ enum: CONSENT_KINDS }) @IsIn(CONSENT_KINDS) kind: Api.ConsentKind;
+  @ApiProperty() @IsBoolean() granted: boolean;
+  @ApiProperty({
+    example: '2026-10-11',
+    description: 'versão do termo (AppConfig.consentVersions)',
+  })
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(40)
+  version: string;
+}
+
+// ---------- Rotina ----------
+
+export const ROUTINE_SLOTS: Api.RoutineSlot[] = ['morning', 'pre_workout', 'afternoon', 'evening'];
+const DATE_KEY = /^\d{4}-\d{2}-\d{2}$/;
+const TIME_HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+export class RoutineItemInputDto
+  implements Omit<Api.RoutineItem, 'title' | 'imageUrl' | 'usageHint'>
+{
+  @ApiProperty({ description: 'id existente ou novo (o BFF gera se vazio)' })
+  @IsString()
+  @MaxLength(80)
+  id: string;
+  @ApiProperty({ example: 'supercoffee-3-0-original-380g' })
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(120)
+  productHandle: string;
+  @ApiProperty({ enum: ROUTINE_SLOTS }) @IsIn(ROUTINE_SLOTS) slot: Api.RoutineSlot;
+  @ApiPropertyOptional({ example: '07:30' })
+  @IsOptional()
+  @Matches(TIME_HHMM, { message: 'reminderTime deve ser HH:mm' })
+  reminderTime?: string;
+  @ApiProperty() @IsBoolean() reminderEnabled: boolean;
+  @ApiProperty({ example: 1 }) @IsInt() @Min(1) @Max(6) dosesPerDay: number;
+}
+
+export class UpdateRoutinePlanDto implements Api.UpdateRoutinePlanRequest {
+  @ApiPropertyOptional({ type: [RoutineItemInputDto] })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(20)
+  @ValidateNested({ each: true })
+  @Type(() => RoutineItemInputDto)
+  items?: RoutineItemInputDto[];
+  @ApiPropertyOptional({ minimum: 1, maximum: 7 })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(7)
+  weeklyGoalDays?: number;
+  @ApiPropertyOptional({ example: 'America/Sao_Paulo' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  timezone?: string;
+}
+
+export const CHECK_IN_SOURCES: Api.CheckIn['source'][] = ['manual', 'reminder', 'wearable'];
+
+export class CheckInDto implements Api.CheckInRequest {
+  @ApiProperty() @IsString() @IsNotEmpty() @MaxLength(80) routineItemId: string;
+  @ApiProperty({ example: '2026-10-11' })
+  @Matches(DATE_KEY, { message: 'date deve ser YYYY-MM-DD' })
+  date: string;
+  @ApiPropertyOptional({ enum: CHECK_IN_SOURCES })
+  @IsOptional()
+  @IsIn(CHECK_IN_SOURCES)
+  source?: Api.CheckIn['source'];
+}
+
+// ---------- Saúde ----------
+
+export const HEALTH_METRICS: Api.HealthMetric[] = [
+  'steps',
+  'active_minutes',
+  'workouts',
+  'sleep_minutes',
+  'resting_heart_rate',
+  'water_ml',
+];
+
+export class HealthDailySampleDto implements Api.HealthDailySample {
+  @ApiProperty({ example: '2026-10-11' })
+  @Matches(DATE_KEY, { message: 'date deve ser YYYY-MM-DD' })
+  date: string;
+  @ApiProperty({ enum: HEALTH_METRICS }) @IsIn(HEALTH_METRICS) metric: Api.HealthMetric;
+  @ApiProperty({ example: 8200 }) @IsNumber() @Min(0) @Max(1_000_000) value: number;
+  @ApiPropertyOptional({ example: 'Apple Watch' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  source?: string;
+}
+
+export class HealthSyncDto implements Api.HealthSyncRequest {
+  @ApiProperty({ type: [HealthDailySampleDto] })
+  @IsArray()
+  @ArrayNotEmpty()
+  @ArrayMaxSize(500)
+  @ValidateNested({ each: true })
+  @Type(() => HealthDailySampleDto)
+  samples: HealthDailySampleDto[];
+  @ApiPropertyOptional({ enum: ['apple_health', 'health_connect'] })
+  @IsOptional()
+  @IsIn(['apple_health', 'health_connect'])
+  provider?: 'apple_health' | 'health_connect';
+}
+
+// ---------- Assistente ----------
+
+export class AssistantContextDto {
+  @ApiPropertyOptional({ example: 'box' }) @IsOptional() @IsString() @MaxLength(60) screen?: string;
+}
+
+export class AssistantSendDto implements Api.AssistantSendRequest {
+  @ApiPropertyOptional({ description: 'ausente = nova conversa' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  threadId?: string;
+  @ApiProperty({ example: 'Quando posso pausar?' })
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(2000)
+  message: string;
+  @ApiPropertyOptional({ type: AssistantContextDto })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => AssistantContextDto)
+  context?: AssistantContextDto;
 }

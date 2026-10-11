@@ -1,5 +1,5 @@
 import { HttpException, HttpStatus } from '@nestjs/common';
-import { ApiError, CapabilityReason } from '../contracts/api';
+import { ApiError, CapabilityReason, ConsentKind } from '../contracts/api';
 
 /**
  * Erro de aplicação já no formato público `{code, message, details?}`.
@@ -39,6 +39,18 @@ export class AppError extends HttpException {
   }
   static unprocessable(code: string, message: string, details?: unknown) {
     return new AppError(HttpStatus.UNPROCESSABLE_ENTITY, code, message, details);
+  }
+  static tooManyRequests(code: string, message: string, details?: unknown) {
+    return new AppError(HttpStatus.TOO_MANY_REQUESTS, code, message, details);
+  }
+  /** 403 quando falta consentimento (LGPD) na versão vigente; `details.kind` diz qual. */
+  static consentRequired(kind: ConsentKind, requiredVersion: string) {
+    return new AppError(
+      HttpStatus.FORBIDDEN,
+      'CONSENT_REQUIRED',
+      'Para usar este recurso é preciso aceitar o termo correspondente no app.',
+      { kind, requiredVersion },
+    );
   }
   /** 403 com a razão da capability (ex.: EDIT_WINDOW_CLOSED). */
   static capabilityDenied(reason: CapabilityReason, details?: unknown) {

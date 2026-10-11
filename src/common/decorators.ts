@@ -1,4 +1,5 @@
 import { createParamDecorator, ExecutionContext, SetMetadata } from '@nestjs/common';
+import { ConsentKind } from '../contracts/api';
 
 export const IS_PUBLIC_KEY = 'isPublic';
 /** Marca uma rota como acessível sem access token. */
@@ -17,7 +18,13 @@ export const CurrentCustomer = createParamDecorator(
   },
 );
 
-export type OwnedResourceKind = 'bill' | 'paymentProfile' | 'device' | 'subscriptionItem';
+export type OwnedResourceKind =
+  | 'bill'
+  | 'paymentProfile'
+  | 'device'
+  | 'subscriptionItem'
+  | 'checkIn'
+  | 'assistantThread';
 
 export const OWNED_RESOURCE_KEY = 'ownedResource';
 export interface OwnedResourceMeta {
@@ -30,3 +37,17 @@ export interface OwnedResourceMeta {
  */
 export const OwnedResource = (kind: OwnedResourceKind, param: string) =>
   SetMetadata<string, OwnedResourceMeta>(OWNED_RESOURCE_KEY, { kind, param });
+
+export const REQUIRES_CONSENT_KEY = 'requiresConsent';
+export interface RequiresConsentMeta {
+  kind: ConsentKind;
+  /** Feature flag (env) que precisa estar ligada; desligada → 404 FEATURE_DISABLED. */
+  feature?: 'routine' | 'health' | 'assistant';
+}
+/**
+ * Exige que o cliente tenha concedido o consentimento `kind` na versão vigente
+ * (`AppConfig.consentVersions`). Caso contrário o ConsentGuard devolve 403 `CONSENT_REQUIRED`
+ * com `details.kind`. Pode ser aplicado ao controller inteiro ou a um handler.
+ */
+export const RequiresConsent = (kind: ConsentKind, feature?: RequiresConsentMeta['feature']) =>
+  SetMetadata<string, RequiresConsentMeta>(REQUIRES_CONSENT_KEY, { kind, feature });

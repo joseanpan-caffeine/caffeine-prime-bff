@@ -5,12 +5,19 @@
 import {
   AddCardRequest,
   AddressQuote,
+  AssistantMessage,
+  AssistantThread,
   Banner,
   Bill,
   CancelRequest,
   Catalog,
+  CheckIn,
+  Consent,
+  ConsentKind,
   Dashboard,
   Fulfillment,
+  HealthDailySample,
+  HealthSummary,
   ItemRecurrence,
   NotificationPreferences,
   PauseRequest,
@@ -20,6 +27,7 @@ import {
   ReasonOption,
   RegisterDeviceRequest,
   RegisterRequest,
+  RoutinePlan,
   ScheduledChange,
   SchedulingRequest,
   ShippingAddress,
@@ -44,6 +52,11 @@ export const DEVICE_STORE = Symbol('DeviceStore');
 export const NOTIFICATION_PREFERENCES_STORE = Symbol('NotificationPreferencesStore');
 export const WEBHOOK_EVENT_STORE = Symbol('WebhookEventStore');
 export const DELETE_REQUEST_STORE = Symbol('DeleteRequestStore');
+export const CONSENT_STORE = Symbol('ConsentStore');
+export const ROUTINE_STORE = Symbol('RoutineStore');
+export const HEALTH_STORE = Symbol('HealthStore');
+export const ASSISTANT_STORE = Symbol('AssistantStore');
+export const ASSISTANT_PROVIDER = Symbol('AssistantProvider');
 export const CLOCK = Symbol('Clock');
 
 // ---------- Relógio (injetável para testes) ----------
@@ -171,15 +184,32 @@ export interface PointsWallet {
   getBalance(customerId: string): Promise<Dashboard['wallet']>;
 }
 
-// ---------- Push (Expo) ----------
+// ---------- Push (Expo / FCM / APNs) ----------
 export interface PushMessage {
   title: string;
   body: string;
   data?: Record<string, unknown>;
 }
 
+export type PushProvider = NonNullable<RegisterDeviceRequest['pushProvider']>;
+
+/** Destino de push: token + provedor que o emitiu (Expo no RN; FCM/APNs no Flutter). */
+export interface PushTarget {
+  token: string;
+  provider: PushProvider;
+}
+
 export interface PushSender {
-  send(expoPushTokens: string[], message: PushMessage): Promise<void>;
+  send(targets: PushTarget[], message: PushMessage): Promise<void>;
+}
+
+/** Converte dispositivos registrados em destinos de push (padrão `expo` para registros antigos). */
+export function toPushTargets(
+  devices: Pick<DeviceRecord, 'pushToken' | 'pushProvider'>[],
+): PushTarget[] {
+  return devices
+    .filter((d) => Boolean(d.pushToken))
+    .map((d) => ({ token: d.pushToken, provider: d.pushProvider ?? 'expo' }));
 }
 
 // ---------- Stores (dados próprios do BFF) ----------
@@ -229,4 +259,109 @@ export interface WebhookEventStore {
 
 export interface DeleteRequestStore {
   create(customerId: string, reason?: string): Promise<{ id: string }>;
+}
+
+// ---------- Consentimentos (LGPD) ----------
+export interface ConsentStore {
+  list(customerId: string): Promise<Consent[]>;
+  get(customerId: string, kind: ConsentKind): Promise<Consent | null>;
+  upsert(customerId: string, consent: Consent): Promise<Consent>;
+  removeAllForCustomer(customerId: string): Promise<void>;
+}
+
+// ---------- Rotina (frente 2) ----------
+export interface StoredRoutinePlan extends RoutinePlan {
+  customerId: string;
+  updatedAt: Date;
+}
+
+export interface CheckInRecord extends CheckIn {
+  customerId: string;
+}
+
+export interface RoutineStore {
+  getPlan(customerId: string): Promise<StoredRoutinePlan | null>;
+  savePlan(customerId: string, plan: RoutinePlan): Promise<StoredRoutinePlan>;
+  /** Planos com ao menos um lembrete ativo (varredura do scheduler). */
+  listPlansWithReminders(): Promise<StoredRoutinePlan[]>;
+  /** Idempotente por (customerId, routineItemId, date): devolve o existente quando já há. */
+  addCheckIn(
+    record: Omit<CheckInRecord, 'id'>,
+  ): Promise<{ checkIn: CheckInRecord; created: boolean }>;
+  removeCheckIn(customerId: string, checkInId: string): Promise<boolean>;
+  /** Check-ins do cliente com `date >= fromDate` (YYYY-MM-DD), ordenados por data. */
+  listCheckIns(customerId: string, fromDate?: string): Promise<CheckInRecord[]>;
+  removeAllForCustomer(customerId: string): Promise<void>;
+}
+
+// ---------- Saúde / wearables (frente 2) ----------
+export interface HealthSyncMeta {
+  provider?: NonNullable<HealthSummary['provider']>;
+  lastSyncAt: Date;
+}
+
+export interface HealthStore {
+  /** Upsert por (customerId, date, metric). */
+  upsertSamples(customerId: string, samples: HealthDailySample[]): Promise<void>;
+  listSamples(customerId: string, fromDate: string, toDate: string): Promise<HealthDailySample[]>;
+  saveSyncMeta(customerId: string, meta: HealthSyncMeta): Promise<void>;
+  getSyncMeta(customerId: string): Promise<HealthSyncMeta | null>;
+  removeAllForCustomer(customerId: string): Promise<void>;
+}
+
+// ---------- Assistente de IA (frente 5) ----------
+export interface AssistantThreadRecord extends AssistantThread {
+  customerId: string;
+}
+
+export interface AssistantStore {
+  listThreads(customerId: string): Promise<AssistantThread[]>;
+  getThread(customerId: string, threadId: string): Promise<AssistantThreadRecord | null>;
+  createThread(
+    customerId: string,
+    title: string | undefined,
+    now: Date,
+  ): Promise<AssistantThreadRecord>;
+  appendMessages(
+    customerId: string,
+    threadId: string,
+    messages: AssistantMessage[],
+  ): Promise<AssistantThreadRecord>;
+  deleteThread(customerId: string, threadId: string): Promise<boolean>;
+  /** Mensagens do cliente (role user) enviadas no intervalo [from, to) — o "dia" em São Paulo. */
+  countUserMessagesBetween(customerId: string, from: Date, to: Date): Promise<number>;
+  removeAllForCustomer(customerId: string): Promise<void>;
+}
+
+/** Contexto injetado no assistente (sem PII: nada de nome, CPF, e-mail ou endereço). */
+export interface AssistantCustomerContext {
+  planName?: string;
+  frequency?: string;
+  status?: string;
+  nextBillingAt?: string;
+  boxItems: { handle: string; title: string; quantity: number }[];
+  capabilities?: Record<string, boolean>;
+  routine?: {
+    currentStreakDays: number;
+    weekCompletion: number;
+    todayCompletion: number;
+    items: { title: string; slot: string; done: boolean }[];
+  };
+  screen?: string;
+}
+
+export interface AssistantReplyInput {
+  customerContext: AssistantCustomerContext;
+  /** Histórico da conversa (já inclui a mensagem nova por último). */
+  thread: Pick<AssistantMessage, 'role' | 'content'>[];
+  message: string;
+}
+
+export interface AssistantReply {
+  content: string;
+  actions?: { label: string; deepLink: string }[];
+}
+
+export interface AssistantProvider {
+  reply(input: AssistantReplyInput): Promise<AssistantReply>;
 }

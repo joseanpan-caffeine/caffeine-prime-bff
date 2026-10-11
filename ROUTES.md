@@ -2,6 +2,7 @@
 
 Tipos em `src/contracts/api.ts`. Auth: `Authorization: Bearer <accessToken>` em tudo exceto `/auth/*`, `/config`, `/payments/vindi-config`, `/webhooks/*`, `/health`.
 Erros: `{code, message, details?}` com HTTP adequado. Mutações aceitam header `Idempotency-Key`.
+Rotas das frentes 2 e 5 (`/me/routine/*`, `/me/health/*`, `/me/assistant/*`) exigem consentimento LGPD na versão vigente (`AppConfig.consentVersions`); sem ele → 403 `CONSENT_REQUIRED` com `details.kind`. Feature flag desligada (`FEATURE_ROUTINE|HEALTH|ASSISTANT=false`) → 404 `FEATURE_DISABLED`.
 
 ## Auth
 | Método | Rota | Body | Resposta |
@@ -54,12 +55,34 @@ Erros: `{code, message, details?}` com HTTP adequado. Mutações aceitam header 
 | POST | /me/delete-request | `{reason?: string}` | 202 |
 
 ## Dispositivo / config
-| POST | /me/devices | RegisterDeviceRequest | `{id}` |
+| POST | /me/devices | RegisterDeviceRequest (`pushToken` + `pushProvider` expo\|fcm\|apns; `expoPushToken` é alias deprecado → expo) | `{id}` |
 | DELETE | /me/devices/:id | — | 204 |
-| GET | /me/notification-preferences | — | NotificationPreferences |
+| GET | /me/notification-preferences | — | NotificationPreferences (inclui `routine`) |
 | PATCH | /me/notification-preferences | Partial<NotificationPreferences> | NotificationPreferences |
-| GET | /config | — | AppConfig |
+| GET | /config | — | AppConfig (`features.routine|health|assistant`, `consentVersions`, `links.healthPrivacy`) |
 | GET | /health | — | `{status:'ok'}` |
+
+## Consentimentos (LGPD)
+| GET | /me/consents | — | Consent[] (todos os tipos; não respondido = `granted:false` na versão vigente) |
+| PUT | /me/consents | UpdateConsentRequest | Consent (422 `CONSENT_VERSION_OUTDATED` se `version` ≠ vigente) |
+
+## Rotina (frente 2) — exige consentimento `routine_data`
+| GET | /me/routine | — | RoutinePlan (padrão derivado da caixa: 1 item por produto; slot por tipo; 404 sem assinatura) |
+| PUT | /me/routine | UpdateRoutinePlanRequest | RoutinePlan (422 `ITEM_NOT_IN_BOX`; 400 `INVALID_TIMEZONE`) |
+| POST | /me/routine/check-ins | CheckInRequest | CheckIn (idempotente por item+data; 422 `CHECK_IN_IN_FUTURE` / `CHECK_IN_TOO_OLD` >7 dias / `ROUTINE_ITEM_NOT_FOUND`) |
+| DELETE | /me/routine/check-ins/:id | — | 204 (403 se de outro cliente) |
+| GET | /me/routine/summary?days=28 | — | RoutineSummary (streaks no fuso do plano, meta semanal, `last28Days`, `stockForecast`) |
+
+## Saúde / wearables (frente 2) — exige consentimento `health_data`
+| POST | /me/health/sync | HealthSyncRequest (só agregados diários; `provider?`) | 204 (upsert por dia+métrica; 30/min) |
+| GET | /me/health/summary | — | HealthSummary (`connected` = amostra nos últimos 7 dias; `suggestions` por regra) |
+
+## Assistente Prime IA (frente 5) — exige consentimento `ai_assistant` (exceto /assistant/config)
+| GET | /assistant/config | — | AssistantConfig |
+| GET | /me/assistant/threads | — | AssistantThread[] (sem mensagens) |
+| GET | /me/assistant/threads/:id | — | AssistantThread |
+| POST | /me/assistant/messages | AssistantSendRequest | AssistantSendResponse (`disclaimer` na 1ª resposta da conversa; 429 `ASSISTANT_LIMIT` ao passar de `ASSISTANT_DAILY_MESSAGE_LIMIT`/dia; 10/min) |
+| DELETE | /me/assistant/threads/:id | — | 204 |
 
 ## Webhooks (sem sessão)
 | POST | /webhooks/vindi?secret= | payload Vindi | 200 |
@@ -79,6 +102,14 @@ Toda ação passa primeiro por `capabilities`; negada → 403 com `code` = razã
 - 60 dias: pelo menos um item com `recurrence null`.
 - Preço: desconto temporário vence o permanente; desconto por faixa de itens (`discountTiers`) do catálogo; arredondar para cima ao centavo. **O valor exibido é o que a API devolve**; nenhum preço/produto/plano fixo em adaptador real.
 - Ciclo de cobrança é de **30 dias**, não um dia fixo do mês: o app mostra `nextBillingAt`; datas seguintes são "previsão".
+
+### Rotina, saúde e assistente (frentes 2 e 5; `src/core/routine.service.ts`, `src/core/health-suggestions.ts`)
+- **Dia civil no fuso do plano** (`RoutinePlan.timezone`, padrão `America/Sao_Paulo`): o app nunca calcula streak localmente. Dia **completo** = todos os itens do plano com check-in. `currentStreakDays` termina hoje ou, se hoje ainda não foi concluído, ontem (o dia em curso não quebra). `weekCompletion` = dias completos de segunda até hoje ÷ `weeklyGoalDays` (máx. 1).
+- **Plano padrão** derivado da caixa: Supercoffee e creatina → `morning`, Morning Shot → `pre_workout`, whey → `evening`; `usageHint` e `dosesPerUnit` vêm do catálogo (metaobjects; fake em `fake-state.ts`). Só produtos da caixa entram no plano; título/imagem sempre da caixa.
+- **Previsão de estoque**: doses da última fatura paga (quantidade × `dosesPerUnit`) − check-ins desde o pagamento; `runsOutAt` pelo ritmo médio observado; `nextBoxAt` = `nextBillingAt`.
+- **Lembretes**: `RemindersScheduler` varre a cada minuto os planos com `reminderEnabled` e envia push quando `reminderTime` = hora local do plano e o item não foi marcado hoje; respeita `NotificationPreferences.routine` e consentimento `push`. Em produção deve virar worker (ver README).
+- **Saúde**: só agregados diários (`HealthDailySample`), nunca séries brutas. Sugestões são **dicas de uso do produto** (treinou → Morning Shot pré-treino; passos < 3000 à tarde → caminhada; sono < 6h → cafeína só até 16h; água baixa) — nunca diagnóstico, prescrição ou dose acima do rótulo.
+- **Assistente**: contexto injetado sem PII (caixa, plano, próxima cobrança, capabilities, resumo da rotina); prompt em `src/modules/assistant/system-prompt.ts` recusa diagnóstico/prescrição/dose e encaminha a profissional; ações só por deep links da allowlist (`app://box`, `app://routine`, `app://subscription/pause`…). Logs só com `customerId`, ids e tamanhos.
 
 ## Contas fake (adaptador em memória)
 Senha de todas: `prime123`.

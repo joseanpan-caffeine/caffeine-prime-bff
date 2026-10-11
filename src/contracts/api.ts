@@ -341,6 +341,10 @@ export interface CatalogProduct {
   inStock: boolean;
   minQuantity: number;
   maxQuantity: number;
+  /** Texto curto "para que serve / como tomar" (metaobject); alimenta `RoutineItem.usageHint`. */
+  usageHint?: string;
+  /** Doses por unidade (ex.: lata 380g = 25 doses); base da previsão de estoque da rotina. */
+  dosesPerUnit?: number;
 }
 
 export interface DiscountTier {
@@ -445,7 +449,11 @@ export interface UpdateAddressRequest
 // ---------- Dispositivos / config ----------
 
 export interface RegisterDeviceRequest {
-  expoPushToken: string;
+  /** Token de push: Expo (RN) ou FCM/APNs (Flutter). */
+  pushToken: string;
+  pushProvider?: 'expo' | 'fcm' | 'apns';
+  /** @deprecated use pushToken */
+  expoPushToken?: string;
   platform: 'ios' | 'android';
   appVersion: string;
   deviceName?: string;
@@ -455,11 +463,167 @@ export interface NotificationPreferences {
   shipping: boolean;
   renewal: boolean;
   marketing: boolean;
+  /** Lembretes da rotina (frente 2). */
+  routine?: boolean;
+}
+
+// ---------- Consentimentos (LGPD) ----------
+
+export type ConsentKind = 'push' | 'health_data' | 'routine_data' | 'ai_assistant' | 'analytics';
+export interface Consent {
+  kind: ConsentKind;
+  granted: boolean;
+  grantedAt?: string;
+  version: string;
+}
+export interface UpdateConsentRequest {
+  kind: ConsentKind;
+  granted: boolean;
+  version: string;
+}
+
+// ---------- Rotina (frente 2: hábitos e suplementação) ----------
+
+export type RoutineSlot = 'morning' | 'pre_workout' | 'afternoon' | 'evening';
+export interface RoutineItem {
+  id: string;
+  productHandle: string; // item da caixa
+  title: string;
+  imageUrl?: string;
+  slot: RoutineSlot;
+  reminderTime?: string; // "07:30" (hora local do aparelho)
+  reminderEnabled: boolean;
+  dosesPerDay: number;
+  /** Texto curto "para que serve / como tomar", vindo dos metaobjects. */
+  usageHint?: string;
+}
+export interface RoutinePlan {
+  items: RoutineItem[];
+  weeklyGoalDays: number; // meta de dias por semana (1–7)
+  timezone: string; // IANA, ex.: America/Sao_Paulo
+}
+export interface UpdateRoutinePlanRequest {
+  items?: Omit<RoutineItem, 'title' | 'imageUrl' | 'usageHint'>[];
+  weeklyGoalDays?: number;
+  timezone?: string;
+}
+export interface CheckIn {
+  id: string;
+  routineItemId: string;
+  date: string; // YYYY-MM-DD (fuso do plano)
+  doneAt: string; // ISO
+  source: 'manual' | 'reminder' | 'wearable';
+}
+export interface CheckInRequest {
+  routineItemId: string;
+  date: string;
+  source?: CheckIn['source'];
+}
+export interface RoutineSummary {
+  today: { date: string; items: { routineItemId: string; done: boolean }[]; completion: number };
+  currentStreakDays: number;
+  longestStreakDays: number;
+  weekCompletion: number; // 0–1
+  last28Days: { date: string; completion: number }[];
+  /** Estimativa de consumo x estoque da caixa (latas chegando vs doses). */
+  stockForecast?: {
+    productHandle: string;
+    dosesLeft: number;
+    runsOutAt?: string;
+    nextBoxAt?: string;
+  }[];
+}
+
+// ---------- Saúde / wearables (frente 2, dados de HealthKit / Health Connect) ----------
+
+export type HealthMetric =
+  | 'steps'
+  | 'active_minutes'
+  | 'workouts'
+  | 'sleep_minutes'
+  | 'resting_heart_rate'
+  | 'water_ml';
+export interface HealthDailySample {
+  date: string;
+  metric: HealthMetric;
+  value: number;
+  source?: string;
+}
+/** O app envia só agregados diários (nunca séries brutas); exige consentimento `health_data`. */
+export interface HealthSyncRequest {
+  samples: HealthDailySample[];
+  /** Origem dos agregados (HealthKit no iOS, Health Connect no Android). */
+  provider?: 'apple_health' | 'health_connect';
+}
+export interface HealthSummary {
+  connected: boolean;
+  provider?: 'apple_health' | 'health_connect' | 'none';
+  lastSyncAt?: string;
+  last7Days: {
+    date: string;
+    steps?: number;
+    activeMinutes?: number;
+    workouts?: number;
+    sleepMinutes?: number;
+  }[];
+  /** Recomendações simples baseadas em regras (ex.: treinou hoje → Morning Shot pré-treino). */
+  suggestions: {
+    id: string;
+    title: string;
+    body: string;
+    productHandle?: string;
+    deepLink?: string;
+  }[];
+}
+
+// ---------- Assistente de IA (frente 5: Prime IA) ----------
+
+export interface AssistantMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  createdAt: string;
+}
+export interface AssistantThread {
+  id: string;
+  title?: string;
+  messages: AssistantMessage[];
+  createdAt: string;
+  updatedAt: string;
+}
+export interface AssistantSendRequest {
+  threadId?: string; // ausente = nova conversa
+  message: string;
+  /** Contexto opcional que o app pode anexar (ex.: tela atual). O BFF já injeta caixa, rotina e plano. */
+  context?: { screen?: string };
+}
+export interface AssistantSendResponse {
+  threadId: string;
+  reply: AssistantMessage;
+  /** Ações sugeridas que o app pode renderizar como botões. */
+  actions?: { label: string; deepLink: string }[];
+  /** Aviso obrigatório exibido na primeira resposta de cada conversa. */
+  disclaimer?: string;
+}
+export interface AssistantConfig {
+  enabled: boolean;
+  disclaimer: string;
+  suggestedPrompts: string[];
+  dailyMessageLimit: number;
 }
 export interface AppConfig {
   minSupportedVersion: string;
+  /** Flags: routine, health, assistant, clubeVantagens, caffeineX… */
   features: Record<string, boolean>;
-  links: { privacy: string; terms: string; support: string; subscribeUrl: string };
+  links: {
+    privacy: string;
+    terms: string;
+    support: string;
+    subscribeUrl: string;
+    healthPrivacy?: string;
+  };
+  /** Versões vigentes dos termos de consentimento. */
+  consentVersions: Partial<Record<ConsentKind, string>>;
 }
 
 // ---------- Erros ----------

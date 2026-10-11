@@ -1,5 +1,6 @@
 // Dados próprios do BFF. A assinatura, faturas e cartões vivem na Prime API/Vindi — aqui só
-// sessões, dispositivos, preferências, eventos de webhook processados e pedidos de exclusão.
+// sessões, dispositivos, preferências, eventos de webhook processados, pedidos de exclusão e os
+// dados das frentes 2 e 5 (consentimentos, rotina, agregados de saúde, conversas do assistente).
 generator client {
   provider = "prisma-client-js"
 }
@@ -26,14 +27,15 @@ model RefreshToken {
 model Device {
   id           String   @id @default(uuid())
   customerId   String
-  expoPushToken String
+  pushToken    String // Expo (RN) ou FCM/APNs (Flutter); antes chamava-se expoPushToken
+  pushProvider String   @default("expo") // expo | fcm | apns
   platform     String // ios | android
   appVersion   String
   deviceName   String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  @@unique([customerId, expoPushToken])
+  @@unique([customerId, pushToken])
   @@index([customerId])
   @@map("devices")
 }
@@ -44,9 +46,97 @@ model NotificationPreference {
   shipping   Boolean  @default(true)
   renewal    Boolean  @default(true)
   marketing  Boolean  @default(false)
+  routine    Boolean  @default(true) // lembretes da rotina (frente 2)
   updatedAt  DateTime @updatedAt
 
   @@map("notification_preferences")
+}
+
+// ---- Consentimentos (LGPD) ----
+model Consent {
+  id         String    @id @default(uuid())
+  customerId String
+  kind       String // push | health_data | routine_data | ai_assistant | analytics
+  granted    Boolean
+  version    String // versão do termo aceita/recusada
+  grantedAt  DateTime?
+  updatedAt  DateTime  @updatedAt
+
+  @@unique([customerId, kind])
+  @@map("consents")
+}
+
+// ---- Rotina (frente 2) ----
+model RoutinePlan {
+  customerId     String   @id
+  timezone       String // IANA
+  weeklyGoalDays Int      @default(5)
+  items          Json // RoutineItem[] (campos editáveis; título/imagem vêm da caixa a cada leitura)
+  updatedAt      DateTime @updatedAt
+
+  @@map("routine_plans")
+}
+
+model RoutineCheckIn {
+  id            String   @id @default(uuid())
+  customerId    String
+  routineItemId String
+  date          String // YYYY-MM-DD no fuso do plano
+  doneAt        DateTime
+  source        String // manual | reminder | wearable
+
+  @@unique([customerId, routineItemId, date])
+  @@index([customerId, date])
+  @@map("routine_check_ins")
+}
+
+// ---- Saúde / wearables (frente 2): só agregados diários, nunca séries brutas ----
+model HealthDailySample {
+  id         String   @id @default(uuid())
+  customerId String
+  date       String // YYYY-MM-DD
+  metric     String // steps | active_minutes | workouts | sleep_minutes | resting_heart_rate | water_ml
+  value      Float
+  source     String?
+  updatedAt  DateTime @updatedAt
+
+  @@unique([customerId, date, metric])
+  @@index([customerId, date])
+  @@map("health_daily_samples")
+}
+
+model HealthSync {
+  customerId String   @id
+  provider   String? // apple_health | health_connect
+  lastSyncAt DateTime
+
+  @@map("health_syncs")
+}
+
+// ---- Assistente de IA (frente 5) ----
+model AssistantThread {
+  id         String             @id @default(uuid())
+  customerId String
+  title      String?
+  createdAt  DateTime           @default(now())
+  updatedAt  DateTime           @updatedAt
+  messages   AssistantMessage[]
+
+  @@index([customerId, updatedAt])
+  @@map("assistant_threads")
+}
+
+model AssistantMessage {
+  id        String          @id @default(uuid())
+  threadId  String
+  thread    AssistantThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  customerId String // redundante para contar o limite diário sem join
+  role      String // user | assistant
+  content   String
+  createdAt DateTime        @default(now())
+
+  @@index([customerId, role, createdAt])
+  @@map("assistant_messages")
 }
 
 model WebhookEvent {

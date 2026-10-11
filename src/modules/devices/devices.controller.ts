@@ -13,6 +13,7 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AuthenticatedCustomer, CurrentCustomer, OwnedResource } from '../../common/decorators';
 import { NotificationPreferencesPatchDto, RegisterDeviceDto } from '../../common/dto';
 import { AppError } from '../../common/errors';
+import { RegisterDeviceRequest } from '../../contracts/api';
 import { ApiOkType, IdSchema, NotificationPreferencesSchema } from '../../common/swagger-schemas';
 import {
   DEVICE_STORE,
@@ -36,7 +37,17 @@ export class DevicesController {
   @ApiOperation({ summary: 'Registra o token de push do dispositivo' })
   @ApiOkType(IdSchema)
   async register(@CurrentCustomer() c: AuthenticatedCustomer, @Body() dto: RegisterDeviceDto) {
-    const device = await this.devices.upsert(c.customerId, dto);
+    // `expoPushToken` é alias deprecado: vira `pushToken` com provedor `expo`.
+    const pushToken = dto.pushToken ?? dto.expoPushToken;
+    if (!pushToken) throw AppError.badRequest('MISSING_PUSH_TOKEN', 'Informe pushToken.');
+    const request: RegisterDeviceRequest = {
+      pushToken,
+      pushProvider: dto.pushProvider ?? 'expo',
+      platform: dto.platform,
+      appVersion: dto.appVersion,
+      ...(dto.deviceName ? { deviceName: dto.deviceName } : {}),
+    };
+    const device = await this.devices.upsert(c.customerId, request);
     return { id: device.id };
   }
 

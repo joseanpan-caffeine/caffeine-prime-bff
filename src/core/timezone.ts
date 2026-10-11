@@ -84,3 +84,49 @@ export function toSaoPauloIso(date: Date): string {
     `${sign}${pad(Math.floor(abs / 60))}:${pad(abs % 60)}`
   );
 }
+
+/** Confere se o fuso IANA é reconhecido pelo runtime (ex.: `America/Sao_Paulo`). */
+export function isValidTimeZone(timeZone: string): boolean {
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone }).format(new Date());
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Dia civil (YYYY-MM-DD) do instante no fuso dado. */
+export function localDateKey(date: Date, timeZone = SAO_PAULO_TZ): string {
+  const p = partsIn(date, timeZone);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${p.year}-${pad(p.month)}-${pad(p.day)}`;
+}
+
+/** Hora local "HH:mm" do instante no fuso dado (ciclo de 24h). */
+export function localTimeHHmm(date: Date, timeZone = SAO_PAULO_TZ): string {
+  const p = partsIn(date, timeZone);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${pad(p.hour)}:${pad(p.minute)}`;
+}
+
+/** Soma dias a uma data civil YYYY-MM-DD (aritmética de calendário, sem fuso). */
+export function addDaysToDateKey(dateKey: string, days: number): string {
+  const [y, m, d] = dateKey.split('-').map(Number);
+  const next = new Date(Date.UTC(y, m - 1, d + days));
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${next.getUTCFullYear()}-${pad(next.getUTCMonth() + 1)}-${pad(next.getUTCDate())}`;
+}
+
+/** Dia da semana (0 = domingo … 6 = sábado) de uma data civil YYYY-MM-DD. */
+export function weekdayOfDateKey(dateKey: string): number {
+  const [y, m, d] = dateKey.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+}
+
+/** Instante (UTC) de 00:00 do dia civil de `date` em um fuso IANA qualquer. */
+export function startOfDayIn(date: Date, timeZone: string): Date {
+  const p = partsIn(date, timeZone);
+  const guess = new Date(Date.UTC(p.year, p.month - 1, p.day, 0, 0, 0));
+  const offset = offsetMinutes(guess, timeZone);
+  return new Date(guess.getTime() - offset * 60000);
+}

@@ -12,7 +12,7 @@ export class ConfigController {
 
   @Get()
   @Public()
-  @ApiOperation({ summary: 'Versão mínima, feature flags e links' })
+  @ApiOperation({ summary: 'Versão mínima, feature flags, links e versões dos consentimentos' })
   @ApiOkType(AppConfigSchema)
   config(): AppConfig {
     return {
@@ -24,8 +24,13 @@ export class ConfigController {
         pix: true,
         singlePurchase: false,
         wallet: true,
+        // Frentes 2 e 5 (env FEATURE_ROUTINE / FEATURE_HEALTH / FEATURE_ASSISTANT)
+        routine: this.env.features.routine,
+        health: this.env.features.health,
+        assistant: this.env.features.assistant,
       },
       links: this.env.app.links,
+      consentVersions: this.env.consentVersions,
     };
   }
 }

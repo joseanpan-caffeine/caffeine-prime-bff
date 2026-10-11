@@ -82,6 +82,9 @@ export function buildFakeCatalog(publicBaseUrl: string = DEFAULT_PUBLIC_BASE_URL
         category: 'Super Coffee',
         imageUrl: `${IMG}/supercoffee-380g.png`,
         price: brl(144.9),
+        usageHint:
+          'Energia e foco: 1 dose (15g) em 200ml de água ou leite, de manhã ou antes do treino.',
+        dosesPerUnit: 25,
         flavors: [
           { handle: 'supercoffee-3-0-original-380g', title: 'Original', inStock: true },
           { handle: 'supercoffee-3-0-chocolate-380g', title: 'Chocolate', inStock: true },
@@ -98,6 +101,9 @@ export function buildFakeCatalog(publicBaseUrl: string = DEFAULT_PUBLIC_BASE_URL
         category: 'Super Coffee',
         imageUrl: `${IMG}/supercoffee-economic.png`,
         price: brl(216.9),
+        usageHint:
+          'Energia e foco: 1 dose (15g) em 200ml de água ou leite, de manhã ou antes do treino.',
+        dosesPerUnit: 28, // 2 potes de 220g × 14 doses
         flavors: [
           { handle: 'supercoffee-3-0-original-economic', title: 'Original', inStock: true },
           { handle: 'supercoffee-3-0-chocolate-economic', title: 'Chocolate', inStock: true },
@@ -113,6 +119,8 @@ export function buildFakeCatalog(publicBaseUrl: string = DEFAULT_PUBLIC_BASE_URL
         category: 'Super Coffee',
         imageUrl: `${IMG}/supercoffee-to-go.png`,
         price: brl(40.65),
+        usageHint: 'Versão de bolso: 1 sachê em 200ml de água, para o meio do dia fora de casa.',
+        dosesPerUnit: 10,
         inStock: true,
         minQuantity: 1,
         maxQuantity: 10,
@@ -123,6 +131,8 @@ export function buildFakeCatalog(publicBaseUrl: string = DEFAULT_PUBLIC_BASE_URL
         category: 'Suplementos',
         imageUrl: `${IMG}/morning-shot.png`,
         price: brl(89.9),
+        usageHint: 'Pré-treino: 1 shot cerca de 20 minutos antes do exercício.',
+        dosesPerUnit: 15,
         inStock: true,
         minQuantity: 1,
         maxQuantity: 4,
@@ -132,6 +142,8 @@ export function buildFakeCatalog(publicBaseUrl: string = DEFAULT_PUBLIC_BASE_URL
         title: 'Creatine Caffeine Army 300g',
         category: 'Suplementos',
         price: brl(119.9),
+        usageHint: 'Força e recuperação: 1 dose (3g) por dia, com água, no mesmo horário.',
+        dosesPerUnit: 30,
         inStock: true,
         minQuantity: 1,
         maxQuantity: 4,
@@ -142,6 +154,8 @@ export function buildFakeCatalog(publicBaseUrl: string = DEFAULT_PUBLIC_BASE_URL
         category: 'Suplementos',
         imageUrl: `${IMG}/whey.png`,
         price: brl(189.9),
+        usageHint: 'Proteína: 1 dose (30g) em água ou leite, no pós-treino ou à noite.',
+        dosesPerUnit: 30,
         flavors: [
           { handle: 'whey-isolado-chocolate-900g', title: 'Chocolate', inStock: true },
           { handle: 'whey-isolado-baunilha-900g', title: 'Baunilha', inStock: true },

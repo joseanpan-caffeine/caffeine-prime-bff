@@ -292,6 +292,9 @@ export class CatalogProductSchema {
   @ApiProperty() inStock: boolean;
   @ApiProperty() minQuantity: number;
   @ApiProperty() maxQuantity: number;
+  @ApiPropertyOptional({ description: 'Para que serve / como tomar' }) usageHint?: string;
+  @ApiPropertyOptional({ description: 'Doses por unidade (previsão de estoque)' })
+  dosesPerUnit?: number;
 }
 
 export class DiscountTierSchema {
@@ -374,6 +377,7 @@ export class NotificationPreferencesSchema {
   @ApiProperty() shipping: boolean;
   @ApiProperty() renewal: boolean;
   @ApiProperty() marketing: boolean;
+  @ApiPropertyOptional({ description: 'Lembretes da rotina' }) routine?: boolean;
 }
 
 export class AppConfigLinksSchema {
@@ -381,7 +385,10 @@ export class AppConfigLinksSchema {
   @ApiProperty() terms: string;
   @ApiProperty() support: string;
   @ApiProperty() subscribeUrl: string;
+  @ApiPropertyOptional() healthPrivacy?: string;
 }
+
+const CONSENT_KINDS = ['push', 'health_data', 'routine_data', 'ai_assistant', 'analytics'];
 
 export class AppConfigSchema {
   @ApiProperty() minSupportedVersion: string;
@@ -390,6 +397,147 @@ export class AppConfigSchema {
     boolean
   >;
   @ApiProperty({ type: AppConfigLinksSchema }) links: AppConfigLinksSchema;
+  @ApiProperty({
+    type: 'object',
+    additionalProperties: { type: 'string' },
+    description: 'Versões vigentes dos termos de consentimento por tipo',
+  })
+  consentVersions: Record<string, string>;
+}
+
+// ---------- Consentimentos ----------
+
+export class ConsentSchema {
+  @ApiProperty({ enum: CONSENT_KINDS }) kind: string;
+  @ApiProperty() granted: boolean;
+  @ApiPropertyOptional() grantedAt?: string;
+  @ApiProperty({ example: '2026-10-11' }) version: string;
+}
+
+// ---------- Rotina ----------
+
+const ROUTINE_SLOTS = ['morning', 'pre_workout', 'afternoon', 'evening'];
+
+export class RoutineItemSchema {
+  @ApiProperty() id: string;
+  @ApiProperty() productHandle: string;
+  @ApiProperty() title: string;
+  @ApiPropertyOptional() imageUrl?: string;
+  @ApiProperty({ enum: ROUTINE_SLOTS }) slot: string;
+  @ApiPropertyOptional({ example: '07:30' }) reminderTime?: string;
+  @ApiProperty() reminderEnabled: boolean;
+  @ApiProperty() dosesPerDay: number;
+  @ApiPropertyOptional() usageHint?: string;
+}
+
+export class RoutinePlanSchema {
+  @ApiProperty({ type: [RoutineItemSchema] }) items: RoutineItemSchema[];
+  @ApiProperty({ minimum: 1, maximum: 7 }) weeklyGoalDays: number;
+  @ApiProperty({ example: 'America/Sao_Paulo' }) timezone: string;
+}
+
+export class CheckInSchema {
+  @ApiProperty() id: string;
+  @ApiProperty() routineItemId: string;
+  @ApiProperty({ example: '2026-10-11' }) date: string;
+  @ApiProperty() doneAt: string;
+  @ApiProperty({ enum: ['manual', 'reminder', 'wearable'] }) source: string;
+}
+
+export class RoutineTodayItemSchema {
+  @ApiProperty() routineItemId: string;
+  @ApiProperty() done: boolean;
+}
+
+export class RoutineTodaySchema {
+  @ApiProperty() date: string;
+  @ApiProperty({ type: [RoutineTodayItemSchema] }) items: RoutineTodayItemSchema[];
+  @ApiProperty({ description: '0–1' }) completion: number;
+}
+
+export class RoutineDaySchema {
+  @ApiProperty() date: string;
+  @ApiProperty({ description: '0–1' }) completion: number;
+}
+
+export class StockForecastSchema {
+  @ApiProperty() productHandle: string;
+  @ApiProperty() dosesLeft: number;
+  @ApiPropertyOptional() runsOutAt?: string;
+  @ApiPropertyOptional() nextBoxAt?: string;
+}
+
+export class RoutineSummarySchema {
+  @ApiProperty({ type: RoutineTodaySchema }) today: RoutineTodaySchema;
+  @ApiProperty() currentStreakDays: number;
+  @ApiProperty() longestStreakDays: number;
+  @ApiProperty({ description: '0–1' }) weekCompletion: number;
+  @ApiProperty({ type: [RoutineDaySchema] }) last28Days: RoutineDaySchema[];
+  @ApiPropertyOptional({ type: [StockForecastSchema] }) stockForecast?: StockForecastSchema[];
+}
+
+// ---------- Saúde ----------
+
+export class HealthDaySchema {
+  @ApiProperty() date: string;
+  @ApiPropertyOptional() steps?: number;
+  @ApiPropertyOptional() activeMinutes?: number;
+  @ApiPropertyOptional() workouts?: number;
+  @ApiPropertyOptional() sleepMinutes?: number;
+}
+
+export class HealthSuggestionSchema {
+  @ApiProperty() id: string;
+  @ApiProperty() title: string;
+  @ApiProperty() body: string;
+  @ApiPropertyOptional() productHandle?: string;
+  @ApiPropertyOptional() deepLink?: string;
+}
+
+export class HealthSummarySchema {
+  @ApiProperty() connected: boolean;
+  @ApiPropertyOptional({ enum: ['apple_health', 'health_connect', 'none'] }) provider?: string;
+  @ApiPropertyOptional() lastSyncAt?: string;
+  @ApiProperty({ type: [HealthDaySchema] }) last7Days: HealthDaySchema[];
+  @ApiProperty({ type: [HealthSuggestionSchema] }) suggestions: HealthSuggestionSchema[];
+}
+
+// ---------- Assistente ----------
+
+export class AssistantMessageSchema {
+  @ApiProperty() id: string;
+  @ApiProperty({ enum: ['user', 'assistant'] }) role: string;
+  @ApiProperty() content: string;
+  @ApiProperty() createdAt: string;
+}
+
+export class AssistantThreadSchema {
+  @ApiProperty() id: string;
+  @ApiPropertyOptional() title?: string;
+  @ApiProperty({ type: [AssistantMessageSchema], description: 'vazio na listagem' })
+  messages: AssistantMessageSchema[];
+  @ApiProperty() createdAt: string;
+  @ApiProperty() updatedAt: string;
+}
+
+export class AssistantActionSchema {
+  @ApiProperty() label: string;
+  @ApiProperty({ example: 'app://routine' }) deepLink: string;
+}
+
+export class AssistantSendResponseSchema {
+  @ApiProperty() threadId: string;
+  @ApiProperty({ type: AssistantMessageSchema }) reply: AssistantMessageSchema;
+  @ApiPropertyOptional({ type: [AssistantActionSchema] }) actions?: AssistantActionSchema[];
+  @ApiPropertyOptional({ description: 'Presente na primeira resposta de cada conversa' })
+  disclaimer?: string;
+}
+
+export class AssistantConfigSchema {
+  @ApiProperty() enabled: boolean;
+  @ApiProperty() disclaimer: string;
+  @ApiProperty({ type: [String] }) suggestedPrompts: string[];
+  @ApiProperty() dailyMessageLimit: number;
 }
 
 export class IdSchema {

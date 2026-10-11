@@ -1,10 +1,14 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { SubscriptionDetail } from '../core/capabilities.service';
 import {
+  ASSISTANT_STORE,
+  AssistantStore,
   DEVICE_STORE,
   DeviceStore,
   PAYMENT_GATEWAY,
   PaymentGateway,
+  ROUTINE_STORE,
+  RoutineStore,
   SUBSCRIPTION_GATEWAY,
   SubscriptionGateway,
 } from '../ports';
@@ -22,6 +26,8 @@ export class OwnershipService {
     @Inject(SUBSCRIPTION_GATEWAY) private readonly subscriptions: SubscriptionGateway,
     @Inject(PAYMENT_GATEWAY) private readonly payments: PaymentGateway,
     @Inject(DEVICE_STORE) private readonly devices: DeviceStore,
+    @Inject(ROUTINE_STORE) private readonly routine: RoutineStore,
+    @Inject(ASSISTANT_STORE) private readonly assistant: AssistantStore,
   ) {}
 
   /** Assinatura do cliente logado; 404 quando não há. */
@@ -49,6 +55,13 @@ export class OwnershipService {
       case 'subscriptionItem': {
         const sub = await this.subscriptions.getByCustomer(customerId);
         return Boolean(sub?.items.some((i) => i.id === id));
+      }
+      case 'checkIn': {
+        const checkIns = await this.routine.listCheckIns(customerId);
+        return checkIns.some((c) => c.id === id);
+      }
+      case 'assistantThread': {
+        return Boolean(await this.assistant.getThread(customerId, id));
       }
       default:
         return false;

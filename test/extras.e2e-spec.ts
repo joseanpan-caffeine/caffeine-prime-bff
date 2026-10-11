@@ -92,12 +92,30 @@ describe('Perfil, endereço, dispositivos, preferências, exclusão', () => {
     });
     expect(dev.status).toBe(201);
     expect(dev.body.id).toBeTruthy();
-    // mesmo token → mesmo id
+    // mesmo token (agora pelo campo novo `pushToken`) → mesmo id
     const again = await api()
       .post('/v1/me/devices')
       .set(auth(a.accessToken))
-      .send({ expoPushToken: 'ExponentPushToken[a1]', platform: 'ios', appVersion: '1.0.1' });
+      .send({ pushToken: 'ExponentPushToken[a1]', platform: 'ios', appVersion: '1.0.1' });
     expect(again.body.id).toBe(dev.body.id);
+    // token FCM (Flutter) com provedor explícito
+    const fcm = await api().post('/v1/me/devices').set(auth(a.accessToken)).send({
+      pushToken: 'fcm-token-android-1',
+      pushProvider: 'fcm',
+      platform: 'android',
+      appVersion: '2.0.0',
+    });
+    expect(fcm.status).toBe(201);
+    expect(fcm.body.id).not.toBe(dev.body.id);
+    // sem nenhum token → 400
+    expect(
+      (
+        await api()
+          .post('/v1/me/devices')
+          .set(auth(a.accessToken))
+          .send({ platform: 'ios', appVersion: '1.0.0' })
+      ).status,
+    ).toBe(400);
 
     const b = await login(app, 'mensal@teste.com');
     expect(
@@ -108,16 +126,23 @@ describe('Perfil, endereço, dispositivos, preferências, exclusão', () => {
     ).toBe(204);
 
     const prefs = await api().get('/v1/me/notification-preferences').set(auth(a.accessToken));
-    expect(prefs.body).toEqual({ billing: true, shipping: true, renewal: true, marketing: false });
+    expect(prefs.body).toEqual({
+      billing: true,
+      shipping: true,
+      renewal: true,
+      marketing: false,
+      routine: true,
+    });
     const patched = await api()
       .patch('/v1/me/notification-preferences')
       .set(auth(a.accessToken))
-      .send({ marketing: true, shipping: false });
+      .send({ marketing: true, shipping: false, routine: false });
     expect(patched.body).toEqual({
       billing: true,
       shipping: false,
       renewal: true,
       marketing: true,
+      routine: false,
     });
   });
 

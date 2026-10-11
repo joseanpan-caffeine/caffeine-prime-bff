@@ -103,6 +103,37 @@ export function loadEnv() {
       url: str('EXPO_PUSH_URL', 'https://exp.host/--/api/v2/push/send'),
       accessToken: str('EXPO_ACCESS_TOKEN'),
     },
+    firebase: {
+      // JSON da service account (string inteira) para o FCM via firebase-admin.
+      serviceAccountJson: str('FIREBASE_SERVICE_ACCOUNT_JSON'),
+    },
+    // Frentes 2 e 5 (docs/contexto-prime.md §2.5): flags do app em GET /config.
+    features: {
+      routine: bool('FEATURE_ROUTINE', true),
+      health: bool('FEATURE_HEALTH', true),
+      assistant: bool('FEATURE_ASSISTANT', true),
+    },
+    /**
+     * Versões vigentes dos termos de consentimento (LGPD, §9). Mudar a versão obriga o app a
+     * pedir o consentimento de novo: rotas gated exigem `granted` na versão corrente.
+     */
+    consentVersions: {
+      push: str('CONSENT_VERSION_PUSH', '2026-10-11'),
+      health_data: str('CONSENT_VERSION_HEALTH_DATA', '2026-10-11'),
+      routine_data: str('CONSENT_VERSION_ROUTINE_DATA', '2026-10-11'),
+      ai_assistant: str('CONSENT_VERSION_AI_ASSISTANT', '2026-10-11'),
+      analytics: str('CONSENT_VERSION_ANALYTICS', '2026-10-11'),
+    },
+    assistant: {
+      model: str('ASSISTANT_MODEL', 'claude-sonnet-4-5'),
+      apiKey: str('ANTHROPIC_API_KEY'),
+      dailyMessageLimit: num('ASSISTANT_DAILY_MESSAGE_LIMIT', 30),
+      maxTokens: num('ASSISTANT_MAX_TOKENS', 700),
+    },
+    reminders: {
+      // Lembretes da rotina (push a cada minuto). Desligado em testes.
+      enabled: bool('REMINDERS_ENABLED', str('NODE_ENV') !== 'test'),
+    },
     app: {
       minSupportedVersion: str('APP_MIN_SUPPORTED_VERSION', '1.0.0'),
       links: {
@@ -110,6 +141,10 @@ export function loadEnv() {
         terms: str('LINK_TERMS', 'https://www.caffeinearmy.com.br/termos-de-uso'),
         support: str('LINK_SUPPORT', 'https://www.caffeinearmy.com.br/atendimento'),
         subscribeUrl: str('LINK_SUBSCRIBE', 'https://www.caffeinearmy.com.br/prime'),
+        healthPrivacy: str(
+          'LINK_HEALTH_PRIVACY',
+          'https://www.caffeinearmy.com.br/politica-de-privacidade#saude',
+        ),
       },
     },
   };
