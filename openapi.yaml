@@ -1,0 +1,2032 @@
+openapi: 3.0.0
+paths:
+  /v1/health:
+    get:
+      operationId: HealthController_health
+      parameters: []
+      responses:
+        "200":
+          description: ""
+      tags:
+        - health
+  /v1/config:
+    get:
+      operationId: ConfigController_config
+      summary: Versão mínima, feature flags e links
+      parameters: []
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AppConfigSchema"
+      tags:
+        - config
+  /v1/auth/login:
+    post:
+      operationId: AuthController_login
+      summary: Login com e-mail e senha (Shopify)
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginDto"
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponseSchema"
+      tags: &a1
+        - auth
+  /v1/auth/google:
+    post:
+      operationId: AuthController_google
+      summary: Login com Google (id_token)
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SocialLoginDto"
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponseSchema"
+      tags: *a1
+  /v1/auth/apple:
+    post:
+      operationId: AuthController_apple
+      summary: Login com Apple (identityToken)
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SocialLoginDto"
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponseSchema"
+      tags: *a1
+  /v1/auth/magic-link:
+    post:
+      operationId: AuthController_magicLink
+      summary: Envia link mágico por e-mail (202 {sent:true}; fake inclui debugToken)
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MagicLinkDto"
+      responses:
+        "202":
+          description: ""
+      tags: *a1
+  /v1/auth/magic-link/exchange:
+    post:
+      operationId: AuthController_exchange
+      summary: Troca o token do link mágico por sessão
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MagicLinkExchangeDto"
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponseSchema"
+      tags: *a1
+  /v1/auth/register:
+    post:
+      operationId: AuthController_register
+      summary: Cadastro de cliente (espelha auth/register da loja)
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterDto"
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponseSchema"
+      tags: *a1
+  /v1/auth/refresh:
+    post:
+      operationId: AuthController_refresh
+      summary: Renova a sessão (rotaciona o refresh token)
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RefreshDto"
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthTokensSchema"
+      tags: *a1
+  /v1/auth/logout:
+    post:
+      operationId: AuthController_logout
+      summary: Revoga o refresh token
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RefreshDto"
+      responses:
+        "204":
+          description: ""
+      tags: *a1
+  /v1/me:
+    get:
+      operationId: MeController_profile
+      summary: Perfil do cliente logado
+      parameters: []
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfileSchema"
+      tags: &a2
+        - me
+      security: &a3
+        - bearer: []
+  /v1/me/profile:
+    patch:
+      operationId: MeController_updateProfile
+      summary: Atualiza nome, telefone e gênero
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProfileDto"
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfileSchema"
+      tags: *a2
+      security: *a3
+  /v1/me/dashboard:
+    get:
+      operationId: MeController_dashboard
+      summary: Dashboard agregado (uma chamada) com capabilities calculadas
+      parameters: []
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardSchema"
+      tags: *a2
+      security: *a3
+  /v1/me/tracking:
+    get:
+      operationId: MeController_tracking
+      summary: Rastreio do último pedido (404 se não há)
+      parameters: []
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FulfillmentSchema"
+      tags: *a2
+      security: *a3
+  /v1/me/savings:
+    get:
+      operationId: MeController_savings
+      summary: Economia acumulada
+      parameters: []
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SavingsSchema"
+      tags: *a2
+      security: *a3
+  /v1/me/wallet:
+    get:
+      operationId: MeController_wallet
+      summary: Pontos Caffeine X
+      parameters: []
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WalletSchema"
+      tags: *a2
+      security: *a3
+  /v1/me/delete-request:
+    post:
+      operationId: MeController_deleteRequest
+      summary: Pedido de exclusão de conta (LGPD / lojas)
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DeleteRequestDto"
+      responses:
+        "202":
+          description: ""
+      tags: *a2
+      security: *a3
+  /v1/me/subscription:
+    get:
+      operationId: SubscriptionController_get
+      summary: Assinatura atual (404 se não há)
+      parameters: []
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SubscriptionSchema"
+      tags: &a4
+        - subscription
+      security: &a5
+        - bearer: []
+  /v1/me/catalog:
+    get:
+      operationId: SubscriptionController_catalog
+      summary: Catálogo para edição da caixa
+      parameters: []
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CatalogSchema"
+      tags: *a4
+      security: *a5
+  /v1/me/subscription/preview:
+    post:
+      operationId: SubscriptionController_preview
+      summary: Preview de preço da caixa (cálculo local)
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PreviewDto"
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PricePreviewSchema"
+      tags: *a4
+      security: *a5
+  /v1/me/subscription/scheduling:
+    post:
+      operationId: SubscriptionController_scheduling
+      summary: Agenda mudança de itens/plano (403 EDIT_WINDOW_CLOSED na janela D-2)
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SchedulingDto"
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScheduledChangeSchema"
+      tags: *a4
+      security: *a5
+    delete:
+      operationId: SubscriptionController_deleteScheduling
+      summary: Desfaz a mudança agendada
+      parameters: []
+      responses:
+        "204":
+          description: ""
+      tags: *a4
+      security: *a5
+  /v1/me/subscription/items/{itemId}/recurrence:
+    patch:
+      operationId: SubscriptionController_recurrence
+      summary: Recorrência 60 dias de um item (422 se todos ficariam on/off)
+      parameters:
+        - name: itemId
+          required: true
+          in: path
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RecurrenceDto"
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SubscriptionSchema"
+      tags: *a4
+      security: *a5
+  /v1/me/subscription/discount:
+    patch:
+      operationId: SubscriptionController_discount
+      summary: Aplica cupom
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DiscountDto"
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SubscriptionSchema"
+      tags: *a4
+      security: *a5
+  /v1/me/subscription/pause:
+    post:
+      operationId: SubscriptionController_pause
+      summary: Pausa a assinatura (403 com reason quando não permitido)
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PauseDto"
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SubscriptionSchema"
+      tags: *a4
+      security: *a5
+  /v1/me/subscription/resume:
+    post:
+      operationId: SubscriptionController_resume
+      summary: Retoma a assinatura pausada
+      parameters: []
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SubscriptionSchema"
+      tags: *a4
+      security: *a5
+  /v1/me/subscription/cancel:
+    post:
+      operationId: SubscriptionController_cancel
+      summary: Cancela a assinatura
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CancelDto"
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SubscriptionSchema"
+      tags: *a4
+      security: *a5
+  /v1/me/subscription/reactivate:
+    post:
+      operationId: SubscriptionController_reactivate
+      summary: Reativa a assinatura cancelada
+      parameters: []
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SubscriptionSchema"
+      tags: *a4
+      security: *a5
+  /v1/me/subscription/cancel-reasons:
+    get:
+      operationId: SubscriptionController_cancelReasons
+      parameters: []
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ReasonOptionSchema"
+      tags: *a4
+      security: *a5
+  /v1/me/subscription/pause-reasons:
+    get:
+      operationId: SubscriptionController_pauseReasons
+      parameters: []
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ReasonOptionSchema"
+      tags: *a4
+      security: *a5
+  /v1/payments/vindi-config:
+    get:
+      operationId: VindiConfigController_vindiConfig
+      summary: Chave pública e URL da Vindi para tokenização no app
+      parameters: []
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VindiConfigSchema"
+      tags:
+        - payments
+  /v1/me/payment-profiles:
+    get:
+      operationId: PaymentsController_listProfiles
+      parameters: []
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PaymentProfileSchema"
+      tags: &a6
+        - payments
+      security: &a7
+        - bearer: []
+    post:
+      operationId: PaymentsController_addProfile
+      summary: Adiciona cartão a partir do gateway_token da Vindi
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddCardDto"
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentProfileSchema"
+      tags: *a6
+      security: *a7
+  /v1/me/payment-profiles/{id}:
+    delete:
+      operationId: PaymentsController_deleteProfile
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        "204":
+          description: ""
+      tags: *a6
+      security: *a7
+  /v1/me/bills:
+    get:
+      operationId: PaymentsController_listBills
+      parameters: []
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/BillSchema"
+      tags: *a6
+      security: *a7
+  /v1/me/bills/{billId}:
+    get:
+      operationId: PaymentsController_getBill
+      parameters:
+        - name: billId
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BillSchema"
+      tags: *a6
+      security: *a7
+  /v1/me/bills/{billId}/pay/pix:
+    post:
+      operationId: PaymentsController_payPix
+      summary: Gera cobrança PIX (fatura volta com `pix`)
+      parameters:
+        - name: billId
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BillSchema"
+      tags: *a6
+      security: *a7
+  /v1/me/bills/{billId}/pay/current-card:
+    post:
+      operationId: PaymentsController_payCurrentCard
+      summary: Cobra no cartão atual da assinatura
+      parameters:
+        - name: billId
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BillSchema"
+      tags: *a6
+      security: *a7
+  /v1/me/bills/{billId}/pay/new-card:
+    post:
+      operationId: PaymentsController_payNewCard
+      summary: Cobra em um cartão novo (gateway_token)
+      parameters:
+        - name: billId
+          required: true
+          in: path
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PayWithNewCardDto"
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BillSchema"
+      tags: *a6
+      security: *a7
+  /v1/me/shipping-address:
+    get:
+      operationId: ShippingController_get
+      parameters: []
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ShippingAddressSchema"
+      tags: &a8
+        - shipping
+      security: &a9
+        - bearer: []
+    patch:
+      operationId: ShippingController_update
+      summary: Atualiza o endereço com a opção de frete escolhida
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateAddressDto"
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ShippingAddressSchema"
+      tags: *a8
+      security: *a9
+  /v1/me/shipping-address/quote:
+    post:
+      operationId: ShippingController_quote
+      summary: Cotação de frete por CEP
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddressQuoteDto"
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AddressQuoteSchema"
+      tags: *a8
+      security: *a9
+  /v1/me/devices:
+    post:
+      operationId: DevicesController_register
+      summary: Registra o token de push do dispositivo
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterDeviceDto"
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IdSchema"
+      tags: &a10
+        - devices
+      security: &a11
+        - bearer: []
+  /v1/me/devices/{id}:
+    delete:
+      operationId: DevicesController_remove
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        "204":
+          description: ""
+      tags: *a10
+      security: *a11
+  /v1/me/notification-preferences:
+    get:
+      operationId: DevicesController_getPrefs
+      parameters: []
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationPreferencesSchema"
+      tags: *a10
+      security: *a11
+    patch:
+      operationId: DevicesController_patchPrefs
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NotificationPreferencesPatchDto"
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationPreferencesSchema"
+      tags: *a10
+      security: *a11
+  /v1/webhooks/vindi:
+    post:
+      operationId: WebhooksController_vindi
+      summary: Postback Vindi (bill_paid, charge_rejected…) — valida ?secret=
+      parameters: []
+      responses:
+        "200":
+          description: ""
+      tags: &a12
+        - webhooks
+  /v1/webhooks/estoca:
+    post:
+      operationId: WebhooksController_estoca
+      summary: Rastreio Estoca (payload cru v1 ou v2) — Bearer
+        FREIGHT_SERVICE_ACCESS_TOKEN
+      parameters: []
+      responses:
+        "200":
+          description: ""
+      tags: *a12
+info:
+  title: Caffeine Prime BFF
+  description: Backend-for-frontend do app Caffeine Army Prime. Contrato em
+    src/contracts/api.ts.
+  version: 1.0.0
+  contact: {}
+tags: []
+servers: []
+components:
+  securitySchemes:
+    bearer:
+      scheme: bearer
+      bearerFormat: JWT
+      type: http
+  schemas:
+    AppConfigLinksSchema:
+      type: object
+      properties:
+        privacy:
+          type: string
+        terms:
+          type: string
+        support:
+          type: string
+        subscribeUrl:
+          type: string
+      required:
+        - privacy
+        - terms
+        - support
+        - subscribeUrl
+    AppConfigSchema:
+      type: object
+      properties:
+        minSupportedVersion:
+          type: string
+        features:
+          type: object
+          additionalProperties:
+            type: boolean
+        links:
+          $ref: "#/components/schemas/AppConfigLinksSchema"
+      required:
+        - minSupportedVersion
+        - features
+        - links
+    UserProfileSchema:
+      type: object
+      properties:
+        id:
+          type: string
+        email:
+          type: string
+        firstName:
+          type: string
+        lastName:
+          type: string
+        cpf:
+          type: string
+          example: "***.***.123-45"
+        phone:
+          type: string
+        gender:
+          type: string
+        hasSubscription:
+          type: boolean
+      required:
+        - id
+        - email
+        - firstName
+        - lastName
+        - hasSubscription
+    AuthResponseSchema:
+      type: object
+      properties:
+        accessToken:
+          type: string
+        refreshToken:
+          type: string
+        expiresIn:
+          type: number
+          example: 900
+        user:
+          $ref: "#/components/schemas/UserProfileSchema"
+      required:
+        - accessToken
+        - refreshToken
+        - expiresIn
+        - user
+    LoginDto:
+      type: object
+      properties:
+        email:
+          type: string
+          example: ativa@teste.com
+        password:
+          type: string
+          example: prime123
+        deviceName:
+          type: string
+          example: iPhone de Mariana
+      required:
+        - email
+        - password
+    SocialLoginDto:
+      type: object
+      properties:
+        idToken:
+          type: string
+          description: "id_token (Google) ou identityToken (Apple). Fake: `fake:<email>`"
+        fullName:
+          type: string
+        deviceName:
+          type: string
+      required:
+        - idToken
+    MagicLinkDto:
+      type: object
+      properties:
+        email:
+          type: string
+          example: ativa@teste.com
+      required:
+        - email
+    MagicLinkExchangeDto:
+      type: object
+      properties:
+        token:
+          type: string
+        deviceName:
+          type: string
+      required:
+        - token
+    RegisterDto:
+      type: object
+      properties:
+        firstName:
+          type: string
+        lastName:
+          type: string
+        email:
+          type: string
+        password:
+          type: string
+        cpf:
+          type: string
+          example: 123.456.789-01
+        phone:
+          type: string
+          example: "+5511999999999"
+        birthDate:
+          type: string
+          example: 1990-05-20
+      required:
+        - firstName
+        - lastName
+        - email
+        - password
+        - cpf
+        - phone
+        - birthDate
+    AuthTokensSchema:
+      type: object
+      properties:
+        accessToken:
+          type: string
+        refreshToken:
+          type: string
+        expiresIn:
+          type: number
+          example: 900
+      required:
+        - accessToken
+        - refreshToken
+        - expiresIn
+    RefreshDto:
+      type: object
+      properties:
+        refreshToken:
+          type: string
+      required:
+        - refreshToken
+    UpdateProfileDto:
+      type: object
+      properties:
+        firstName:
+          type: string
+        lastName:
+          type: string
+        phone:
+          type: string
+        gender:
+          type: string
+    MoneySchema:
+      type: object
+      properties:
+        amount:
+          type: number
+          example: 144.9
+        currency:
+          type: string
+          enum:
+            - BRL
+      required:
+        - amount
+        - currency
+    ProductItemSchema:
+      type: object
+      properties:
+        id:
+          type: string
+        handle:
+          type: string
+        title:
+          type: string
+        flavor:
+          type: string
+        imageUrl:
+          type: string
+        sku:
+          type: string
+        quantity:
+          type: number
+        price:
+          $ref: "#/components/schemas/MoneySchema"
+        discountPercentage:
+          type: number
+        finalPrice:
+          $ref: "#/components/schemas/MoneySchema"
+        recurrence:
+          type: string
+          enum:
+            - on
+            - off
+          nullable: true
+        cyclesLeft:
+          type: number
+        isGift:
+          type: boolean
+      required:
+        - id
+        - handle
+        - title
+        - quantity
+        - price
+        - discountPercentage
+        - finalPrice
+        - recurrence
+    DiscountSchema:
+      type: object
+      properties:
+        code:
+          type: string
+        percentage:
+          type: number
+        temporaryCode:
+          type: string
+        temporaryPercentage:
+          type: number
+        temporaryCycles:
+          type: number
+      required:
+        - percentage
+    PaymentProfileSchema:
+      type: object
+      properties:
+        id:
+          type: string
+        brand:
+          type: string
+          example: Visa
+        lastFour:
+          type: string
+          example: "4242"
+        holderName:
+          type: string
+        expiration:
+          type: string
+          example: 08/2029
+        isDefault:
+          type: boolean
+      required:
+        - id
+        - brand
+        - lastFour
+        - holderName
+        - expiration
+        - isDefault
+    ShippingAddressSchema:
+      type: object
+      properties:
+        id:
+          type: string
+        recipient:
+          type: string
+        postalCode:
+          type: string
+        street:
+          type: string
+        number:
+          type: string
+        complement:
+          type: string
+        neighborhood:
+          type: string
+        city:
+          type: string
+        state:
+          type: string
+        deliveryMethod:
+          type: string
+        deliveryEstimateDays:
+          type: number
+      required:
+        - id
+        - recipient
+        - postalCode
+        - street
+        - number
+        - neighborhood
+        - city
+        - state
+    SubscriptionPauseSchema:
+      type: object
+      properties:
+        cycles:
+          type: number
+        remainingCycles:
+          type: number
+        pausedAt:
+          type: string
+        resumeAt:
+          type: string
+      required:
+        - cycles
+        - remainingCycles
+        - pausedAt
+        - resumeAt
+    ScheduledChangeSchema:
+      type: object
+      properties:
+        id:
+          type: string
+        appliesAt:
+          type: string
+        frequency:
+          type: string
+          enum:
+            - Mensal
+            - Trimestral
+            - Semestral
+            - Anual
+        planName:
+          type: string
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProductItemSchema"
+        total:
+          $ref: "#/components/schemas/MoneySchema"
+        nextCycleOnly:
+          type: boolean
+      required:
+        - id
+        - appliesAt
+        - frequency
+        - planName
+        - items
+        - total
+        - nextCycleOnly
+    SubscriptionSchema:
+      type: object
+      properties:
+        id:
+          type: string
+        status:
+          type: string
+          enum:
+            - active
+            - future
+            - paused
+            - canceled
+            - fraud_review
+        frequency:
+          type: string
+          enum:
+            - Mensal
+            - Trimestral
+            - Semestral
+            - Anual
+        planName:
+          type: string
+        startedAt:
+          type: string
+        nextBillingAt:
+          type: string
+        currentCycle:
+          type: number
+        paidCycles:
+          type: number
+        remainingCommitmentMonths:
+          type: number
+          description: -1 para Mensal
+        pauseCreditsLeft:
+          type: number
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProductItemSchema"
+        discount:
+          $ref: "#/components/schemas/DiscountSchema"
+        paymentProfile:
+          $ref: "#/components/schemas/PaymentProfileSchema"
+        shippingAddress:
+          $ref: "#/components/schemas/ShippingAddressSchema"
+        pause:
+          $ref: "#/components/schemas/SubscriptionPauseSchema"
+        scheduledChange:
+          $ref: "#/components/schemas/ScheduledChangeSchema"
+        subtotal:
+          $ref: "#/components/schemas/MoneySchema"
+        totalDiscount:
+          $ref: "#/components/schemas/MoneySchema"
+        total:
+          $ref: "#/components/schemas/MoneySchema"
+      required:
+        - id
+        - status
+        - frequency
+        - planName
+        - startedAt
+        - nextBillingAt
+        - currentCycle
+        - paidCycles
+        - remainingCommitmentMonths
+        - pauseCreditsLeft
+        - items
+        - discount
+        - subtotal
+        - totalDiscount
+        - total
+    LastCanceledSchema:
+      type: object
+      properties:
+        canceledAt:
+          type: string
+        reason:
+          type: string
+        subscriptionId:
+          type: string
+      required:
+        - canceledAt
+        - subscriptionId
+    CapabilitySchema:
+      type: object
+      properties:
+        allowed:
+          type: boolean
+        reason:
+          type: string
+          enum: &a13
+            - EDIT_WINDOW_CLOSED
+            - SUBSCRIPTION_NOT_ACTIVE
+            - FREQUENCY_NOT_ELIGIBLE
+            - NO_PAUSE_CREDITS
+            - PENDING_BILL
+            - NOT_PAUSED
+            - NOT_CANCELED
+            - CANCELLATION_BLOCKED
+            - UNDER_REVIEW
+        until:
+          type: string
+      required:
+        - allowed
+    PauseCapabilitySchema:
+      type: object
+      properties:
+        allowed:
+          type: boolean
+        reason:
+          type: string
+          enum: *a13
+        until:
+          type: string
+        creditsLeft:
+          type: number
+        maxCycles:
+          type: number
+      required:
+        - allowed
+    CancelCapabilitySchema:
+      type: object
+      properties:
+        allowed:
+          type: boolean
+        reason:
+          type: string
+          enum: *a13
+        until:
+          type: string
+        remainingCommitmentMonths:
+          type: number
+        earlyWindow:
+          type: boolean
+      required:
+        - allowed
+    PendingBillSchema:
+      type: object
+      properties:
+        id:
+          type: string
+        amount:
+          $ref: "#/components/schemas/MoneySchema"
+        dueAt:
+          type: string
+        pixAvailable:
+          type: boolean
+      required:
+        - id
+        - amount
+        - dueAt
+        - pixAvailable
+    CapabilitiesSchema:
+      type: object
+      properties:
+        canEdit:
+          $ref: "#/components/schemas/CapabilitySchema"
+        canPause:
+          $ref: "#/components/schemas/PauseCapabilitySchema"
+        canResume:
+          $ref: "#/components/schemas/CapabilitySchema"
+        canCancel:
+          $ref: "#/components/schemas/CancelCapabilitySchema"
+        canReactivate:
+          $ref: "#/components/schemas/CapabilitySchema"
+        canChangeCard:
+          $ref: "#/components/schemas/CapabilitySchema"
+        canChangeAddress:
+          $ref: "#/components/schemas/CapabilitySchema"
+        hasPendingBill:
+          type: boolean
+        pendingBill:
+          $ref: "#/components/schemas/PendingBillSchema"
+      required:
+        - canEdit
+        - canPause
+        - canResume
+        - canCancel
+        - canReactivate
+        - canChangeCard
+        - canChangeAddress
+        - hasPendingBill
+    PixChargeSchema:
+      type: object
+      properties:
+        qrCodeImageUrl:
+          type: string
+        qrCodeText:
+          type: string
+        expiresAt:
+          type: string
+      required:
+        - qrCodeImageUrl
+        - qrCodeText
+        - expiresAt
+    TrackingEventSchema:
+      type: object
+      properties:
+        status:
+          type: string
+        description:
+          type: string
+        occurredAt:
+          type: string
+        location:
+          type: string
+      required:
+        - status
+        - description
+        - occurredAt
+    FulfillmentSchema:
+      type: object
+      properties:
+        status:
+          type: string
+          enum:
+            - pending
+            - processing
+            - shipped
+            - in_transit
+            - out_for_delivery
+            - delivered
+            - failed
+        carrier:
+          type: string
+        trackingCode:
+          type: string
+        trackingUrl:
+          type: string
+        estimatedDeliveryAt:
+          type: string
+        events:
+          type: array
+          items:
+            $ref: "#/components/schemas/TrackingEventSchema"
+      required:
+        - status
+        - events
+    BillSchema:
+      type: object
+      properties:
+        id:
+          type: string
+        cycle:
+          type: number
+        status:
+          type: string
+          enum:
+            - pending
+            - paid
+            - canceled
+            - review
+        issuedAt:
+          type: string
+        dueAt:
+          type: string
+        paidAt:
+          type: string
+        amount:
+          $ref: "#/components/schemas/MoneySchema"
+        paymentMethod:
+          type: string
+          enum:
+            - credit_card
+            - pix
+        paymentProfile:
+          $ref: "#/components/schemas/PaymentProfileSchema"
+        pix:
+          $ref: "#/components/schemas/PixChargeSchema"
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProductItemSchema"
+        fulfillment:
+          $ref: "#/components/schemas/FulfillmentSchema"
+      required:
+        - id
+        - cycle
+        - status
+        - issuedAt
+        - dueAt
+        - amount
+        - items
+    SavingsSchema:
+      type: object
+      properties:
+        last12Months:
+          $ref: "#/components/schemas/MoneySchema"
+        sinceStart:
+          $ref: "#/components/schemas/MoneySchema"
+      required:
+        - last12Months
+        - sinceStart
+    WalletSchema:
+      type: object
+      properties:
+        points:
+          type: number
+        label:
+          type: string
+      required:
+        - points
+        - label
+    BannerSchema:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        subtitle:
+          type: string
+        imageUrl:
+          type: string
+        deepLink:
+          type: string
+      required:
+        - id
+        - title
+    DashboardSchema:
+      type: object
+      properties:
+        user:
+          $ref: "#/components/schemas/UserProfileSchema"
+        subscription:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/SubscriptionSchema"
+        lastCanceled:
+          $ref: "#/components/schemas/LastCanceledSchema"
+        capabilities:
+          $ref: "#/components/schemas/CapabilitiesSchema"
+        latestBill:
+          $ref: "#/components/schemas/BillSchema"
+        tracking:
+          $ref: "#/components/schemas/FulfillmentSchema"
+        savings:
+          $ref: "#/components/schemas/SavingsSchema"
+        wallet:
+          $ref: "#/components/schemas/WalletSchema"
+        banners:
+          type: array
+          items:
+            $ref: "#/components/schemas/BannerSchema"
+      required:
+        - user
+        - subscription
+        - capabilities
+        - savings
+        - wallet
+        - banners
+    DeleteRequestDto:
+      type: object
+      properties:
+        reason:
+          type: string
+    PlanSchema:
+      type: object
+      properties:
+        frequency:
+          type: string
+          enum:
+            - Mensal
+            - Trimestral
+            - Semestral
+            - Anual
+        name:
+          type: string
+        commitmentMonths:
+          type: number
+        discountPercentage:
+          type: number
+        pauseCredits:
+          type: number
+        highlight:
+          type: string
+      required:
+        - frequency
+        - name
+        - commitmentMonths
+        - discountPercentage
+        - pauseCredits
+    FlavorSchema:
+      type: object
+      properties:
+        handle:
+          type: string
+        title:
+          type: string
+        inStock:
+          type: boolean
+      required:
+        - handle
+        - title
+        - inStock
+    CatalogProductSchema:
+      type: object
+      properties:
+        handle:
+          type: string
+        title:
+          type: string
+        category:
+          type: string
+        imageUrl:
+          type: string
+        price:
+          $ref: "#/components/schemas/MoneySchema"
+        flavors:
+          type: array
+          items:
+            $ref: "#/components/schemas/FlavorSchema"
+        inStock:
+          type: boolean
+        minQuantity:
+          type: number
+        maxQuantity:
+          type: number
+      required:
+        - handle
+        - title
+        - category
+        - price
+        - inStock
+        - minQuantity
+        - maxQuantity
+    DiscountTierSchema:
+      type: object
+      properties:
+        minItems:
+          type: number
+        discountPercentage:
+          type: number
+        label:
+          type: string
+      required:
+        - minItems
+        - discountPercentage
+        - label
+    GiftSchema:
+      type: object
+      properties:
+        handle:
+          type: string
+        title:
+          type: string
+        imageUrl:
+          type: string
+        requiresPlan:
+          type: array
+          items:
+            type: string
+      required:
+        - handle
+        - title
+    CatalogSchema:
+      type: object
+      properties:
+        plans:
+          type: array
+          items:
+            $ref: "#/components/schemas/PlanSchema"
+        products:
+          type: array
+          items:
+            $ref: "#/components/schemas/CatalogProductSchema"
+        discountTiers:
+          type: array
+          items:
+            $ref: "#/components/schemas/DiscountTierSchema"
+        gifts:
+          type: array
+          items:
+            $ref: "#/components/schemas/GiftSchema"
+      required:
+        - plans
+        - products
+        - discountTiers
+        - gifts
+    PricePreviewItemSchema:
+      type: object
+      properties:
+        handle:
+          type: string
+        quantity:
+          type: number
+        recurrence:
+          type: string
+          enum:
+            - on
+            - off
+          nullable: true
+        title:
+          type: string
+        unitPrice:
+          $ref: "#/components/schemas/MoneySchema"
+        discountPercentage:
+          type: number
+        finalUnitPrice:
+          $ref: "#/components/schemas/MoneySchema"
+      required:
+        - handle
+        - quantity
+        - title
+        - unitPrice
+        - discountPercentage
+        - finalUnitPrice
+    PricePreviewSchema:
+      type: object
+      properties:
+        frequency:
+          type: string
+          enum:
+            - Mensal
+            - Trimestral
+            - Semestral
+            - Anual
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/PricePreviewItemSchema"
+        subtotal:
+          $ref: "#/components/schemas/MoneySchema"
+        totalDiscount:
+          $ref: "#/components/schemas/MoneySchema"
+        total:
+          $ref: "#/components/schemas/MoneySchema"
+        appliedDiscountPercentage:
+          type: number
+        couponApplied:
+          type: string
+        warnings:
+          type: array
+          items:
+            type: string
+      required:
+        - frequency
+        - items
+        - subtotal
+        - totalDiscount
+        - total
+        - appliedDiscountPercentage
+        - warnings
+    BoxItemInputDto:
+      type: object
+      properties:
+        handle:
+          type: string
+          example: supercoffee-3-0-original-380g
+        quantity:
+          type: number
+          example: 2
+        recurrence:
+          type: string
+          enum:
+            - on
+            - off
+          nullable: true
+          description: null = todo ciclo
+      required:
+        - handle
+        - quantity
+    PreviewDto:
+      type: object
+      properties:
+        frequency:
+          type: string
+          enum: &a14
+            - Mensal
+            - Trimestral
+            - Semestral
+            - Anual
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/BoxItemInputDto"
+        couponCode:
+          type: string
+          example: PRIME10
+      required:
+        - frequency
+        - items
+    SchedulingDto:
+      type: object
+      properties:
+        frequency:
+          type: string
+          enum: *a14
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/BoxItemInputDto"
+        couponCode:
+          type: string
+          example: PRIME10
+        giftHandles:
+          type: array
+          items:
+            type: string
+        nextCycleOnly:
+          type: boolean
+        reason:
+          type: string
+      required:
+        - frequency
+        - items
+    RecurrenceDto:
+      type: object
+      properties:
+        recurrence:
+          type: string
+          enum:
+            - on
+            - off
+          nullable: true
+      required:
+        - recurrence
+    DiscountDto:
+      type: object
+      properties:
+        code:
+          type: string
+          example: PRIME10
+      required:
+        - code
+    AnswerDto:
+      type: object
+      properties:
+        question:
+          type: string
+        answer:
+          type: string
+      required:
+        - question
+        - answer
+    PauseDto:
+      type: object
+      properties:
+        cycles:
+          type: number
+          example: 1
+          minimum: 1
+          maximum: 2
+        reason:
+          type: string
+          example: stock
+        answers:
+          type: array
+          items:
+            $ref: "#/components/schemas/AnswerDto"
+      required:
+        - cycles
+        - reason
+    CancelDto:
+      type: object
+      properties:
+        reason:
+          type: string
+          example: price
+        answers:
+          type: array
+          items:
+            $ref: "#/components/schemas/AnswerDto"
+      required:
+        - reason
+    FollowUpSchema:
+      type: object
+      properties:
+        question:
+          type: string
+        options:
+          type: array
+          items:
+            type: string
+      required:
+        - question
+        - options
+    ReasonOptionSchema:
+      type: object
+      properties:
+        code:
+          type: string
+        label:
+          type: string
+        followUp:
+          $ref: "#/components/schemas/FollowUpSchema"
+      required:
+        - code
+        - label
+    VindiConfigSchema:
+      type: object
+      properties:
+        publicKey:
+          type: string
+        apiUrl:
+          type: string
+        sandbox:
+          type: boolean
+      required:
+        - publicKey
+        - apiUrl
+        - sandbox
+    AddCardDto:
+      type: object
+      properties:
+        gatewayToken:
+          type: string
+          example: tok_visa_4242
+        paymentCompanyCode:
+          type: string
+          example: visa
+        setAsDefault:
+          type: boolean
+      required:
+        - gatewayToken
+    PayWithNewCardDto:
+      type: object
+      properties:
+        gatewayToken:
+          type: string
+          example: tok_mastercard_5555
+        paymentCompanyCode:
+          type: string
+      required:
+        - gatewayToken
+    AddressQuoteOptionSchema:
+      type: object
+      properties:
+        id:
+          type: string
+        method:
+          type: string
+        carrier:
+          type: string
+        estimateDays:
+          type: number
+        price:
+          $ref: "#/components/schemas/MoneySchema"
+      required:
+        - id
+        - method
+        - carrier
+        - estimateDays
+        - price
+    AddressQuoteSchema:
+      type: object
+      properties:
+        postalCode:
+          type: string
+        city:
+          type: string
+        state:
+          type: string
+        street:
+          type: string
+        neighborhood:
+          type: string
+        options:
+          type: array
+          items:
+            $ref: "#/components/schemas/AddressQuoteOptionSchema"
+      required:
+        - postalCode
+        - city
+        - state
+        - options
+    AddressQuoteDto:
+      type: object
+      properties:
+        postalCode:
+          type: string
+          example: 01311-000
+      required:
+        - postalCode
+    UpdateAddressDto:
+      type: object
+      properties:
+        recipient:
+          type: string
+        postalCode:
+          type: string
+          example: 01311-000
+        street:
+          type: string
+        number:
+          type: string
+        complement:
+          type: string
+        neighborhood:
+          type: string
+        city:
+          type: string
+        state:
+          type: string
+          example: SP
+        quoteOptionId:
+          type: string
+          description: id da opção devolvida por /me/shipping-address/quote
+      required:
+        - recipient
+        - postalCode
+        - street
+        - number
+        - neighborhood
+        - city
+        - state
+        - quoteOptionId
+    IdSchema:
+      type: object
+      properties:
+        id:
+          type: string
+      required:
+        - id
+    RegisterDeviceDto:
+      type: object
+      properties:
+        expoPushToken:
+          type: string
+          example: ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]
+        platform:
+          type: string
+          enum:
+            - ios
+            - android
+        appVersion:
+          type: string
+          example: 1.0.0
+        deviceName:
+          type: string
+      required:
+        - expoPushToken
+        - platform
+        - appVersion
+    NotificationPreferencesSchema:
+      type: object
+      properties:
+        billing:
+          type: boolean
+        shipping:
+          type: boolean
+        renewal:
+          type: boolean
+        marketing:
+          type: boolean
+      required:
+        - billing
+        - shipping
+        - renewal
+        - marketing
+    NotificationPreferencesPatchDto:
+      type: object
+      properties:
+        billing:
+          type: boolean
+        shipping:
+          type: boolean
+        renewal:
+          type: boolean
+        marketing:
+          type: boolean

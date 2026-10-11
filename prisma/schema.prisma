@@ -1,0 +1,72 @@
+// Dados próprios do BFF. A assinatura, faturas e cartões vivem na Prime API/Vindi — aqui só
+// sessões, dispositivos, preferências, eventos de webhook processados e pedidos de exclusão.
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model RefreshToken {
+  id         String    @id @default(uuid())
+  tokenHash  String    @unique // sha256 do refresh token opaco
+  customerId String
+  deviceName String?
+  createdAt  DateTime  @default(now())
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  replacedBy String? // hash do token que substituiu este (rotação)
+
+  @@index([customerId])
+  @@map("refresh_tokens")
+}
+
+model Device {
+  id           String   @id @default(uuid())
+  customerId   String
+  expoPushToken String
+  platform     String // ios | android
+  appVersion   String
+  deviceName   String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([customerId, expoPushToken])
+  @@index([customerId])
+  @@map("devices")
+}
+
+model NotificationPreference {
+  customerId String   @id
+  billing    Boolean  @default(true)
+  shipping   Boolean  @default(true)
+  renewal    Boolean  @default(true)
+  marketing  Boolean  @default(false)
+  updatedAt  DateTime @updatedAt
+
+  @@map("notification_preferences")
+}
+
+model WebhookEvent {
+  id          String    @id @default(uuid())
+  source      String // vindi | estoca | prime
+  externalId  String
+  receivedAt  DateTime  @default(now())
+  processedAt DateTime?
+  payload     Json?
+
+  @@unique([source, externalId])
+  @@map("webhook_events")
+}
+
+model DeleteRequest {
+  id         String   @id @default(uuid())
+  customerId String
+  reason     String?
+  createdAt  DateTime @default(now())
+
+  @@index([customerId])
+  @@map("delete_requests")
+}

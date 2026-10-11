@@ -1,0 +1,36 @@
+# Postgres para os dados próprios do BFF (sessões, dispositivos, preferências, eventos de webhook).
+# O serviço também roda sem banco (adaptadores em memória) quando DATABASE_URL não está definido.
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: prime
+      POSTGRES_PASSWORD: prime
+      POSTGRES_DB: caffeine_prime_bff
+    ports:
+      - '5432:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U prime']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  bff:
+    build: .
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PORT: 3333
+      ADAPTERS: fake
+      JWT_SECRET: docker-dev-secret
+      DATABASE_URL: postgresql://prime:prime@postgres:5432/caffeine_prime_bff
+      VINDI_WEBHOOK_SECRET: dev-secret
+      FREIGHT_SERVICE_ACCESS_TOKEN: dev-freight-token
+    ports:
+      - '3333:3333'
+
+volumes:
+  pgdata:
