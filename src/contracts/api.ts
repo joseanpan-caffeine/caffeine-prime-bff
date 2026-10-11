@@ -127,11 +127,19 @@ export interface ShippingAddress {
   deliveryEstimateDays?: number;
 }
 
+/**
+ * Origem da pausa (docs/contexto-prime.md §6.2): `User` é pedida pelo cliente e consome 1 crédito
+ * por ciclo; `Offer` é a pausa de retenção oferecida pelo CS, ignora elegibilidade e não consome
+ * crédito. O app só cria pausas `User`.
+ */
+export type PauseType = 'User' | 'Offer';
+
 export interface SubscriptionPause {
   cycles: number;
   remainingCycles: number;
   pausedAt: string;
   resumeAt: string; // ISO
+  pauseType?: PauseType; // ausente = 'User'
 }
 
 export interface ScheduledChange {
@@ -145,8 +153,18 @@ export interface ScheduledChange {
 }
 
 export interface Subscription {
+  /**
+   * Nunca guardar como permanente: numa troca de plano a Prime API cria uma assinatura nova
+   * (`future`) e cancela a atual, então o id muda (docs/contexto-prime.md §4.3, caso B).
+   */
   id: string;
   status: SubscriptionStatus;
+  /**
+   * Presente só quando a Prime API devolveu um status fora do enum conhecido (o campo lá é
+   * string livre). Nesse caso `status` vem normalizado para 'active' e o app mostra um estado
+   * genérico "Status: {rawStatus}" sem quebrar (docs/contexto-prime.md §8 item 5).
+   */
+  rawStatus?: string;
   frequency: Frequency;
   planName: string;
   startedAt: string;
@@ -210,32 +228,69 @@ export interface Bill {
   pix?: PixCharge; // presente se há cobrança PIX pendente
   items: ProductItem[];
   fulfillment?: Fulfillment;
+  /**
+   * Fatura de ciclo pausado: durante a pausa a Vindi continua gerando uma fatura por ciclo com
+   * valor R$ 0,00 (100% de desconto). É esperado, não é erro; o app mostra "Ciclo pausado"
+   * (docs/contexto-prime.md §5.3).
+   */
+  pausedCycle?: boolean;
 }
 
 // ---------- Capacidades (regras calculadas no servidor) ----------
 
+/**
+ * Razões de bloqueio (regras oficiais em docs/contexto-prime.md §6.1, calculadas no BFF em
+ * America/Sao_Paulo):
+ * - EDIT_WINDOW_CLOSED: edição bloqueada de D-3 00:00 até a cobrança.
+ * - MIN_PAID_CYCLES: pausa só a partir da 4ª cobrança (3 cobranças pagas).
+ * - PAUSE_WINDOW_CLOSED: pedido de pausa só até D-3 da cobrança.
+ * - RESUME_WINDOW_CLOSED: desfazer a pausa só até D-5 da cobrança do ciclo pausado.
+ * - COMMITMENT_ACTIVE: cancelamento travado enquanto há fidelidade restante.
+ * - CANCEL_WINDOW_CLOSED: fidelidade cumprida, mas já é o dia da cobrança seguinte.
+ */
 export type CapabilityReason =
   | 'EDIT_WINDOW_CLOSED'
   | 'SUBSCRIPTION_NOT_ACTIVE'
   | 'FREQUENCY_NOT_ELIGIBLE'
   | 'NO_PAUSE_CREDITS'
+  | 'MIN_PAID_CYCLES'
+  | 'PAUSE_WINDOW_CLOSED'
+  | 'RESUME_WINDOW_CLOSED'
   | 'PENDING_BILL'
   | 'NOT_PAUSED'
   | 'NOT_CANCELED'
   | 'CANCELLATION_BLOCKED'
+  | 'COMMITMENT_ACTIVE'
+  | 'CANCEL_WINDOW_CLOSED'
   | 'UNDER_REVIEW';
 
 export interface Capability {
   allowed: boolean;
   reason?: CapabilityReason;
+  /** Quando bloqueada por janela: instante (ISO, offset de São Paulo) em que a ação reabre. */
   until?: string;
+  /**
+   * Quando permitida e sujeita a janela: instante (ISO, offset de São Paulo) em que a ação deixa
+   * de ser permitida (ex.: canEdit → D-3 00:00; canResume → D-5 00:00; canCancel com fidelidade
+   * cumprida → 00:00 do dia da cobrança). O app exibe "até {data}" sem calcular prazo localmente.
+   */
+  closesAt?: string;
 }
 
 export interface Capabilities {
   canEdit: Capability;
   canPause: Capability & { creditsLeft?: number; maxCycles?: number };
   canResume: Capability;
-  canCancel: Capability & { remainingCommitmentMonths?: number; earlyWindow?: boolean };
+  canCancel: Capability & {
+    remainingCommitmentMonths?: number;
+    earlyWindow?: boolean;
+    /**
+     * Estimativa (ISO) de quando a fidelidade termina: nextBillingAt + meses restantes.
+     * Ausente para Mensal (sem fidelidade). É estimativa porque o ciclo é de 30 dias, não
+     * um dia fixo do mês (docs/contexto-prime.md §6.3).
+     */
+    commitmentEndsAt?: string;
+  };
   canReactivate: Capability;
   canChangeCard: Capability;
   canChangeAddress: Capability;

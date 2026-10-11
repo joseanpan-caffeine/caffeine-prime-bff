@@ -14,6 +14,7 @@ import {
   ItemRecurrence,
   NotificationPreferences,
   PauseRequest,
+  PauseType,
   PaymentProfile,
   PayWithNewCardRequest,
   ReasonOption,
@@ -92,7 +93,17 @@ export interface SubscriptionGateway {
   findBill(billId: string): Promise<{ customerId: string; bill: Bill } | null>;
   createScheduling(subscriptionId: string, request: SchedulingRequest): Promise<ScheduledChange>;
   deleteScheduling(subscriptionId: string, scheduleId: string): Promise<void>;
-  pause(subscriptionId: string, request: PauseRequest, now: Date): Promise<SubscriptionDetail>;
+  /**
+   * Pausa iniciada pelo cliente (`pauseType: 'User'`, padrão): consome 1 crédito por ciclo e cada
+   * ciclo pausado gera fatura de R$ 0,00 que não conta para a fidelidade. `'Offer'` é a pausa de
+   * retenção (CS): ignora elegibilidade e não consome crédito; nunca exposta na rota pública.
+   */
+  pause(
+    subscriptionId: string,
+    request: PauseRequest,
+    now: Date,
+    pauseType?: PauseType,
+  ): Promise<SubscriptionDetail>;
   resume(subscriptionId: string): Promise<SubscriptionDetail>;
   cancel(subscriptionId: string, request: CancelRequest, now: Date): Promise<SubscriptionDetail>;
   reactivate(subscriptionId: string): Promise<SubscriptionDetail>;

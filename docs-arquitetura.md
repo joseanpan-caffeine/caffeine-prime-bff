@@ -37,7 +37,7 @@ Webhooks (Vindi, Prime, Estoca) ──▶ BFF /webhooks/* ──▶ push + inval
 Princípios:
 1. O app só conhece o BFF. Nenhuma chave de terceiro no app, exceto a chave **pública** da Vindi.
 2. O BFF nunca confia em IDs vindos do app: resolve o cliente pelo token e só opera na assinatura dele.
-3. Regras de negócio (D-2, créditos de pausa, elegibilidade de cancelamento, melhor desconto) são decididas no servidor; o app recebe `allowed: false, reason: "..."` e exibe.
+3. Regras de negócio (janelas D-3/D-5, pausa a partir da 4ª cobrança, créditos de pausa, trava de fidelidade, melhor desconto) são decididas no servidor; o app recebe `allowed: false, reason: "..."` e exibe.
 4. Uma chamada por tela: o BFF agrega as 6–7 fontes que o dashboard da loja consulta e devolve um JSON pronto.
 
 ## 3. Stack
@@ -166,14 +166,15 @@ O `GET /me/dashboard` devolve um bloco calculado pelo BFF; o app não reimplemen
 }
 ```
 
-Regras aplicadas (doc 01 §4):
-- **Edição**: bloqueada entre D-2 e `nextBillingAt` (§4.14). O BFF calcula em America/Sao_Paulo e armazena/compara em UTC (resolve ponto 1 do §11).
-- **Pausa**: só `active`, frequência Semestral/Anual, `pauseCredit > 0`; créditos Anual=2, Semestral=1 (§4.5). Em assinatura pausada: exibir data de retomada (`SubscriptionPause.startAt`).
-- **Fidelidade**: `remainingCancelation` e `earlyRemainingCancellation` exibidos como "X meses restantes"; cancelamento segue `checkCancellationEligibility`/`cancellationBlocked` da API.
+Regras aplicadas (regra oficial em `docs/contexto-prime.md` §6.1; detalhe em ROUTES.md "Regras"):
+- **Edição**: bloqueada de D-3 00:00 (America/Sao_Paulo) até `nextBillingAt`. Regra oficial é D-3; a Prime API só bloqueia em D-2 (divergência §6.3). O BFF calcula em America/Sao_Paulo e armazena/compara em UTC (resolve ponto 1 do §11).
+- **Pausa**: só `active`, frequência Semestral/Anual, `pauseCredit > 0`, **a partir da 4ª cobrança paga** (`MIN_PAID_CYCLES`) e **pedido até D-3** (`PAUSE_WINDOW_CLOSED`); créditos Anual=2, Semestral=1, 1 crédito por ciclo pausado. Ciclo pausado gera fatura R$ 0,00 (`pausedCycle`) e não conta para a fidelidade. **Desfazer a pausa até D-5** (`RESUME_WINDOW_CLOSED`). Em assinatura pausada: exibir data de retomada.
+- **Fidelidade**: `remainingCancelation` → `remainingCommitmentMonths`; cancelamento travado enquanto > 0 (`COMMITMENT_ACTIVE`, com `commitmentEndsAt` estimado); com 0, permitido até a véspera da cobrança (`CANCEL_WINDOW_CLOSED` no dia). `cancellationBlocked` da API continua valendo. `earlyRemainingCancellation` é legado e é ignorado.
+- **Troca de plano**: outra `frequency` cria assinatura `future` nova e cancela a atual (caso B, §4.3): o id muda; o BFF resolve sempre a assinatura corrente do cliente.
 - **60 dias**: nunca permitir todos os itens com `status = on` (§4.6).
 - **Preview de preço**: desconto temporário vence o permanente; promo por produto vence se o valor absoluto for maior, empate = desconto do plano; arredondar para cima ao centavo (§4.3–4.4). O preview é informativo; o valor final vem da Prime API na resposta do scheduling.
 - **PIX pendente**: QR em `bill.charges[]` com `paymentMethodName = Pix` e status `pending`; lembrar que PIX vencido vira cobrança no cartão à meia-noite (§4.11), então o app mostra o prazo.
-- **Status**: `active`, `future`, `paused`, `canceled`, `fraud_review`; `fraud_review` abre tela "em análise" sem ações.
+- **Status**: `active`, `future`, `paused`, `canceled`, `fraud_review`; `fraud_review` abre tela "em análise" sem ações. Valor fora desse enum (string livre na Prime API) vira `active` + `rawStatus`; o app mostra "Status: {rawStatus}" e segue navegando.
 
 ## 7. Segurança
 

@@ -8,6 +8,14 @@ import { HttpClient } from './http-client';
 /**
  * Catálogo via metaobjects da Shopify Admin API (planos, produtos, faixas de desconto, brindes, motivos).
  * Env: SHOPIFY_STORE_DOMAIN, SHOPIFY_ADMIN_ACCESS_TOKEN (escopo read_metaobjects). Cache sugerido: 10 min.
+ *
+ * Invariantes (docs/contexto-prime.md §7): NUNCA fixar lista de produtos, planos, brindes ou
+ * descontos aqui — campanhas mudam por CMS sem deploy. Metaobjetos reais: `prime_planos_listagem`
+ * (planos e brindes), `prime_gift_band` (brindes por faixa de latas), `prime_faixa_de_desconto`
+ * (desconto progressivo; ler sem cache), `prime_special_collections`. Armadilhas: booleanos são
+ * texto ("true"/"false" minúsculos), item sem campo obrigatório é descartado, campo ausente ou
+ * malformado deve ser tratado com segurança, sem quebrar a rota. "Lata válida" = handle com
+ * `economic-size` ou `classic-size`. Os preços vêm da Shopify/Prime API, nunca daqui.
  */
 @Injectable()
 export class ShopifyMetaobjectCatalog implements CatalogSource {

@@ -50,14 +50,16 @@ Senha de todas: `prime123`. Datas são relativas ao momento em que o servidor so
 | E-mail | Cenário |
 |---|---|
 | ativa@teste.com | Anual, ativa, 2 créditos de pausa, próxima cobrança em 12 dias, último pedido em trânsito |
-| janela@teste.com | Semestral, ativa, próxima cobrança amanhã (janela D-2 fechada → `EDIT_WINDOW_CLOSED`) |
-| pausada@teste.com | Anual, pausada, retoma em 2 ciclos |
+| janela@teste.com | Semestral, ativa, próxima cobrança amanhã (janela D-3 fechada → `EDIT_WINDOW_CLOSED` e `PAUSE_WINDOW_CLOSED`) |
+| pausada@teste.com | Anual, pausada por 2 ciclos: 1º já faturado em R$ 0,00 (`pausedCycle`), falta 1; 0 créditos |
 | pendente@teste.com | Trimestral, ativa com fatura pendente e PIX disponível |
 | agendada@teste.com | Anual, ativa com mudança agendada |
 | cancelada@teste.com | cancelada há 20 dias (pode reativar) |
 | analise@teste.com | `fraud_review` (tudo bloqueado com `UNDER_REVIEW`) |
 | mensal@teste.com | Mensal, ativa, sem créditos de pausa |
 | semassinatura@teste.com | cliente Shopify sem assinatura |
+| novata@teste.com | Anual com 1 cobrança paga: ainda não pode pausar (`MIN_PAID_CYCLES`) |
+| fim-fidelidade@teste.com | Anual com fidelidade cumprida: pode cancelar até a véspera da cobrança |
 
 Atalhos do modo fake:
 
@@ -90,7 +92,7 @@ Os módulos Nest dependem apenas das portas em `src/ports/`, então nada fora de
 src/
   contracts/api.ts        contrato público (tipos do app)
   core/                   domínio puro, sem dependências externas
-    capabilities.service  regras: janela D-2 (America/Sao_Paulo), pausa, cancelamento, fatura pendente
+    capabilities.service  regras: janelas D-3/D-5 (America/Sao_Paulo), pausa (4ª cobrança), fidelidade, fatura pendente
     pricing.service       preview: plano × cupom temporário × faixas de itens, arredondamento p/ cima
     recurrence-rules      60 dias: ao menos um item com recurrence null
   ports/                  interfaces + tokens de injeção (SubscriptionGateway, IdentityProvider, PaymentGateway,
@@ -123,7 +125,7 @@ scripts/generate-openapi.ts
 
 - `pixAvailable` é `true` para qualquer fatura pendente (a Prime API permite `createPixCharge`); o campo `pix`
   da fatura só aparece após o app pedir o QR.
-- `canChangeAddress` também respeita a janela D-2 (o pedido do ciclo nasce na cobrança).
+- `canChangeAddress` também respeita a janela D-3 (o pedido do ciclo nasce na cobrança).
 - `earlyWindow` = `remainingCommitmentMonths > 0` (cancelamento dentro da fidelidade).
 - Preview: faixa de itens (`discountTiers`) concorre com o desconto base (plano ou cupom); cupom temporário
   substitui o permanente mesmo que menor; cupom permanente só entra se melhor. Preço unitário final arredondado

@@ -2,7 +2,7 @@ import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { auth, bootTestApp, login } from './helpers';
 
-describe('Login + dashboard das 9 contas fake', () => {
+describe('Login + dashboard das 11 contas fake', () => {
   let app: INestApplication;
   beforeAll(async () => {
     app = await bootTestApp();
@@ -27,7 +27,13 @@ describe('Login + dashboard das 9 contas fake', () => {
     expect(days).toBeGreaterThan(11);
     expect(days).toBeLessThan(13);
     expect(d.capabilities.canEdit.allowed).toBe(true);
-    expect(d.capabilities.canPause).toEqual({ allowed: true, creditsLeft: 2, maxCycles: 2 });
+    expect(d.capabilities.canEdit.closesAt).toMatch(/T00:00:00-0[23]:00$/); // D-3 00:00 em São Paulo
+    expect(d.capabilities.canPause).toEqual({
+      allowed: true,
+      closesAt: d.capabilities.canEdit.closesAt,
+      creditsLeft: 2,
+      maxCycles: 2,
+    });
     expect(d.tracking.status).toBe('in_transit');
     expect(d.latestBill.status).toBe('paid');
     expect(d.subscription).not.toHaveProperty('cancellationBlocked');
@@ -35,21 +41,32 @@ describe('Login + dashboard das 9 contas fake', () => {
     expect(d.wallet.points).toBeGreaterThan(0);
   });
 
-  it('janela@teste.com: Semestral com janela D-2 fechada', async () => {
+  it('janela@teste.com: Semestral com janela D-3 fechada (edição e pedido de pausa)', async () => {
     const d = await dashboard('janela@teste.com');
     expect(d.subscription.frequency).toBe('Semestral');
     expect(d.capabilities.canEdit.allowed).toBe(false);
     expect(d.capabilities.canEdit.reason).toBe('EDIT_WINDOW_CLOSED');
     expect(d.capabilities.canEdit.until).toMatch(/-03:00$/);
-    expect(d.capabilities.canPause.allowed).toBe(true);
+    expect(d.capabilities.canPause).toMatchObject({
+      allowed: false,
+      reason: 'PAUSE_WINDOW_CLOSED',
+      creditsLeft: 1,
+    });
+    expect(d.capabilities.canPause.until).toBe(d.capabilities.canEdit.until);
   });
 
-  it('pausada@teste.com: Anual pausada, retoma em 2 ciclos', async () => {
+  it('pausada@teste.com: Anual pausada, 1 ciclo pausado já faturado em R$ 0, falta 1', async () => {
     const d = await dashboard('pausada@teste.com');
     expect(d.subscription.status).toBe('paused');
-    expect(d.subscription.pause.remainingCycles).toBe(2);
-    expect(d.capabilities.canResume.allowed).toBe(true);
+    expect(d.subscription.pause.remainingCycles).toBe(1);
+    expect(d.subscription.pauseCreditsLeft).toBe(0);
+    expect(d.capabilities.canResume.allowed).toBe(true); // cobrança em 18 dias: antes de D-5
     expect(d.capabilities.canPause.reason).toBe('SUBSCRIPTION_NOT_ACTIVE');
+    expect(d.latestBill).toMatchObject({
+      pausedCycle: true,
+      status: 'paid',
+      amount: { amount: 0 },
+    });
   });
 
   it('pendente@teste.com: Trimestral com fatura pendente e PIX', async () => {
@@ -100,6 +117,32 @@ describe('Login + dashboard das 9 contas fake', () => {
       creditsLeft: 0,
     });
     expect(d.capabilities.canCancel.earlyWindow).toBe(false);
+  });
+
+  it('novata@teste.com: Anual com 1 cobrança paga, ainda não pode pausar', async () => {
+    const d = await dashboard('novata@teste.com');
+    expect(d.subscription.frequency).toBe('Anual');
+    expect(d.subscription.paidCycles).toBe(1);
+    expect(d.capabilities.canPause).toEqual({
+      allowed: false,
+      reason: 'MIN_PAID_CYCLES',
+      creditsLeft: 2,
+      maxCycles: 2,
+    });
+    expect(d.capabilities.canEdit.allowed).toBe(true);
+    expect(d.capabilities.canCancel.reason).toBe('COMMITMENT_ACTIVE');
+  });
+
+  it('fim-fidelidade@teste.com: Anual com fidelidade cumprida, pode cancelar', async () => {
+    const d = await dashboard('fim-fidelidade@teste.com');
+    expect(d.subscription.remainingCommitmentMonths).toBe(0);
+    expect(d.capabilities.canCancel).toMatchObject({
+      allowed: true,
+      remainingCommitmentMonths: 0,
+      earlyWindow: false,
+    });
+    expect(d.capabilities.canCancel.commitmentEndsAt).toMatch(/-03:00$/);
+    expect(d.capabilities.canPause.allowed).toBe(true);
   });
 
   it('semassinatura@teste.com: sem assinatura', async () => {

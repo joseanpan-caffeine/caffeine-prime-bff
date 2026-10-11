@@ -86,6 +86,8 @@ export class SubscriptionPauseSchema {
   @ApiProperty() remainingCycles: number;
   @ApiProperty() pausedAt: string;
   @ApiProperty() resumeAt: string;
+  @ApiPropertyOptional({ enum: ['User', 'Offer'], description: 'Offer = pausa de retenção' })
+  pauseType?: string;
 }
 
 export class ScheduledChangeSchema {
@@ -101,6 +103,8 @@ export class ScheduledChangeSchema {
 export class SubscriptionSchema {
   @ApiProperty() id: string;
   @ApiProperty({ enum: ['active', 'future', 'paused', 'canceled', 'fraud_review'] }) status: string;
+  @ApiPropertyOptional({ description: 'Status original quando fora do enum conhecido' })
+  rawStatus?: string;
   @ApiProperty({ enum: ['Mensal', 'Trimestral', 'Semestral', 'Anual'] }) frequency: string;
   @ApiProperty() planName: string;
   @ApiProperty() startedAt: string;
@@ -166,6 +170,8 @@ export class BillSchema {
   @ApiPropertyOptional({ type: PixChargeSchema }) pix?: PixChargeSchema;
   @ApiProperty({ type: [ProductItemSchema] }) items: ProductItemSchema[];
   @ApiPropertyOptional({ type: FulfillmentSchema }) fulfillment?: FulfillmentSchema;
+  @ApiPropertyOptional({ description: 'Fatura R$ 0,00 de ciclo pausado (esperado, não erro)' })
+  pausedCycle?: boolean;
 }
 
 const REASONS = [
@@ -173,17 +179,24 @@ const REASONS = [
   'SUBSCRIPTION_NOT_ACTIVE',
   'FREQUENCY_NOT_ELIGIBLE',
   'NO_PAUSE_CREDITS',
+  'MIN_PAID_CYCLES',
+  'PAUSE_WINDOW_CLOSED',
+  'RESUME_WINDOW_CLOSED',
   'PENDING_BILL',
   'NOT_PAUSED',
   'NOT_CANCELED',
   'CANCELLATION_BLOCKED',
+  'COMMITMENT_ACTIVE',
+  'CANCEL_WINDOW_CLOSED',
   'UNDER_REVIEW',
 ];
 
 export class CapabilitySchema {
   @ApiProperty() allowed: boolean;
   @ApiPropertyOptional({ enum: REASONS }) reason?: string;
-  @ApiPropertyOptional() until?: string;
+  @ApiPropertyOptional({ description: 'Quando reabre (ISO, São Paulo)' }) until?: string;
+  @ApiPropertyOptional({ description: 'Quando a ação deixa de ser permitida (ISO, São Paulo)' })
+  closesAt?: string;
 }
 
 export class PauseCapabilitySchema extends CapabilitySchema {
@@ -194,6 +207,8 @@ export class PauseCapabilitySchema extends CapabilitySchema {
 export class CancelCapabilitySchema extends CapabilitySchema {
   @ApiPropertyOptional() remainingCommitmentMonths?: number;
   @ApiPropertyOptional() earlyWindow?: boolean;
+  @ApiPropertyOptional({ description: 'Estimativa ISO do fim da fidelidade' })
+  commitmentEndsAt?: string;
 }
 
 export class PendingBillSchema {

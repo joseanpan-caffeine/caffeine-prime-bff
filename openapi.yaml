@@ -329,7 +329,8 @@ paths:
   /v1/me/subscription/scheduling:
     post:
       operationId: SubscriptionController_scheduling
-      summary: Agenda mudança de itens/plano (403 EDIT_WINDOW_CLOSED na janela D-2)
+      summary: Agenda mudança de itens/plano (403 EDIT_WINDOW_CLOSED na janela D-3;
+        outra frequency cria assinatura nova → id muda)
       parameters: []
       requestBody:
         required: true
@@ -1132,6 +1133,12 @@ components:
           type: string
         resumeAt:
           type: string
+        pauseType:
+          type: string
+          enum:
+            - User
+            - Offer
+          description: Offer = pausa de retenção
       required:
         - cycles
         - remainingCycles
@@ -1182,6 +1189,9 @@ components:
             - paused
             - canceled
             - fraud_review
+        rawStatus:
+          type: string
+          description: Status original quando fora do enum conhecido
         frequency:
           type: string
           enum:
@@ -1264,13 +1274,22 @@ components:
             - SUBSCRIPTION_NOT_ACTIVE
             - FREQUENCY_NOT_ELIGIBLE
             - NO_PAUSE_CREDITS
+            - MIN_PAID_CYCLES
+            - PAUSE_WINDOW_CLOSED
+            - RESUME_WINDOW_CLOSED
             - PENDING_BILL
             - NOT_PAUSED
             - NOT_CANCELED
             - CANCELLATION_BLOCKED
+            - COMMITMENT_ACTIVE
+            - CANCEL_WINDOW_CLOSED
             - UNDER_REVIEW
         until:
           type: string
+          description: Quando reabre (ISO, São Paulo)
+        closesAt:
+          type: string
+          description: Quando a ação deixa de ser permitida (ISO, São Paulo)
       required:
         - allowed
     PauseCapabilitySchema:
@@ -1283,6 +1302,10 @@ components:
           enum: *a13
         until:
           type: string
+          description: Quando reabre (ISO, São Paulo)
+        closesAt:
+          type: string
+          description: Quando a ação deixa de ser permitida (ISO, São Paulo)
         creditsLeft:
           type: number
         maxCycles:
@@ -1299,10 +1322,17 @@ components:
           enum: *a13
         until:
           type: string
+          description: Quando reabre (ISO, São Paulo)
+        closesAt:
+          type: string
+          description: Quando a ação deixa de ser permitida (ISO, São Paulo)
         remainingCommitmentMonths:
           type: number
         earlyWindow:
           type: boolean
+        commitmentEndsAt:
+          type: string
+          description: Estimativa ISO do fim da fidelidade
       required:
         - allowed
     PendingBillSchema:
@@ -1444,6 +1474,9 @@ components:
             $ref: "#/components/schemas/ProductItemSchema"
         fulfillment:
           $ref: "#/components/schemas/FulfillmentSchema"
+        pausedCycle:
+          type: boolean
+          description: Fatura R$ 0,00 de ciclo pausado (esperado, não erro)
       required:
         - id
         - cycle

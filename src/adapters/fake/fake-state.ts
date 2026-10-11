@@ -1,6 +1,6 @@
 /**
  * Estado em memória compartilhado por todos os adaptadores fake.
- * Semeado com as 9 contas de ROUTES.md e dados realistas relativos a `now`.
+ * Semeado com as 11 contas de ROUTES.md e dados realistas relativos a `now`.
  */
 import {
   Banner,
@@ -244,6 +244,17 @@ export interface FakeOrderRef {
   billId: string;
 }
 
+/**
+ * Assinatura original substituída por uma troca de plano (caso B de docs/contexto-prime.md
+ * §4.3): a Prime API cria uma assinatura `future` nova e cancela a atual. Guardamos a original
+ * para que cancelar o agendamento a reative e apague a futura.
+ */
+export interface ReplacedSubscription {
+  customerId: string;
+  original: SubscriptionDetail;
+  previousLastCanceled: LastCanceled | null;
+}
+
 export class FakeState {
   accounts = new Map<string, FakeAccount>();
   subscriptions = new Map<string, SubscriptionDetail>();
@@ -253,12 +264,15 @@ export class FakeState {
   magicLinks = new Map<string, { email: string; expiresAt: Date }>();
   /** external_id (Estoca/Shopify order) e trackingCode → fatura */
   orderRefs = new Map<string, FakeOrderRef>();
+  /** id da assinatura `future` criada por troca de plano → original cancelada (caso B, §4.3) */
+  replacedByScheduling = new Map<string, ReplacedSubscription>();
   catalog: Catalog;
   /** handle do sabor → imagem (ver `buildFakeFlavorImages`) */
   flavorImages: Record<string, string>;
   coupons: Coupon[] = FAKE_COUPONS;
   private nextCustomerId = 7100;
   private nextBillSeq = 1;
+  private nextSubscriptionSeq = 1;
 
   constructor(
     public readonly seededAt: Date = new Date(),
@@ -298,6 +312,37 @@ export class FakeState {
 
   newBillId(customerId: string, cycle: number): string {
     return `bill-${customerId}-${cycle}-${this.nextBillSeq++}`;
+  }
+
+  /** Id de uma assinatura nova nascida de troca de plano (nunca reutiliza o id anterior). */
+  newSubscriptionId(customerId: string): string {
+    return `sub-${customerId}-f${this.nextSubscriptionSeq++}`;
+  }
+
+  /**
+   * Fatura de ciclo pausado: a Vindi segue gerando uma fatura por ciclo durante a pausa, com
+   * 100% de desconto (R$ 0,00) e já paga. Não gera pedido nem conta para a fidelidade (§5.3/§6.2).
+   */
+  buildPausedCycleBill(sub: SubscriptionDetail, cycle: number, billingAt: Date): Bill {
+    const customerId = this.customerIdOf(sub.id);
+    return {
+      id: this.newBillId(customerId, cycle),
+      cycle,
+      status: 'paid',
+      issuedAt: billingAt.toISOString(),
+      dueAt: billingAt.toISOString(),
+      paidAt: billingAt.toISOString(),
+      amount: brl(0),
+      paymentMethod: 'credit_card',
+      paymentProfile: sub.paymentProfile,
+      items: [],
+      pausedCycle: true,
+    };
+  }
+
+  /** `sub-7001` → `7001`; `sub-7001-f2` → `7001`. */
+  customerIdOf(subscriptionId: string): string {
+    return subscriptionId.replace(/^sub-/, '').split('-')[0];
   }
 
   /** Monta um ProductItem a partir do catálogo aplicando o percentual de desconto. */
@@ -451,7 +496,7 @@ export class FakeState {
       extra: Partial<Bill> = {},
     ): Bill => {
       const bill: Bill = {
-        id: this.newBillId(sub.id.replace('sub-', ''), cycle),
+        id: this.newBillId(this.customerIdOf(sub.id), cycle),
         cycle,
         status,
         issuedAt: iso(issuedAt),
@@ -572,7 +617,7 @@ export class FakeState {
       addBills(a.customerId, bills.reverse());
     }
 
-    // 2) janela@teste.com — Semestral, ativa, próxima cobrança amanhã (janela D-2 fechada)
+    // 2) janela@teste.com — Semestral, ativa, próxima cobrança amanhã (janela D-3 fechada: edição e pausa)
     {
       const a = addAccount({
         customerId: '7002',
@@ -628,7 +673,8 @@ export class FakeState {
       addBills(a.customerId, bills);
     }
 
-    // 3) pausada@teste.com — Anual, pausada, retoma em 2 ciclos
+    // 3) pausada@teste.com — Anual, pausada por 2 ciclos: o 1º ciclo pausado já foi faturado
+    //    em R$ 0,00 (há 12 dias) e o 2º sai em 18 dias; retoma na cobrança seguinte.
     {
       const a = addAccount({
         customerId: '7003',
@@ -649,7 +695,7 @@ export class FakeState {
         startedAt: addMonths(now, -4),
         nextBillingAt: nextBilling,
         currentCycle: 5,
-        pauseCreditsLeft: 1,
+        pauseCreditsLeft: 0, // 2 créditos do Anual gastos: 1 por ciclo pausado
         items: [
           { handle: 'supercoffee-3-0-original-economic', quantity: 1 },
           { handle: 'whey-isolado-chocolate-900g', quantity: 1 },
@@ -667,15 +713,22 @@ export class FakeState {
       });
       sub.pause = {
         cycles: 2,
-        remainingCycles: 2,
-        pausedAt: iso(addDays(now, -3)),
-        resumeAt: iso(addMonths(nextBilling, 2)),
+        remainingCycles: 1,
+        pausedAt: iso(addDays(now, -20)),
+        resumeAt: iso(addMonths(nextBilling, 1)),
+        pauseType: 'User',
       };
+      // currentCycle 5 = ciclo pausado já faturado (R$ 0,00); o 6º também será pausado.
+      sub.currentCycle = 6;
+      sub.paidCycles = 4; // ciclo pausado não conta como cobrança paga
       this.subscriptions.set(a.customerId, sub);
-      addBills(
-        a.customerId,
-        [4, 3, 2, 1].map((c) => makeBill(sub, c, addDays(nextBilling, -30 * (5 - c)), 'paid')),
-      );
+      const pausedBill = this.buildPausedCycleBill(sub, 5, addDays(now, -12));
+      addBills(a.customerId, [
+        pausedBill,
+        ...[4, 3, 2, 1].map((c) =>
+          makeBill(sub, c, addDays(addDays(now, -12), -30 * (5 - c)), 'paid'),
+        ),
+      ]);
     }
 
     // 4) pendente@teste.com — Trimestral, ativa com fatura pendente e PIX disponível
@@ -940,5 +993,87 @@ export class FakeState {
       cpf: '36925814755',
       phone: '+5511991122334',
     });
+
+    // 10) novata@teste.com — Anual com só 1 cobrança paga: ainda não pode pausar (MIN_PAID_CYCLES)
+    {
+      const a = addAccount({
+        customerId: '7010',
+        email: 'novata@teste.com',
+        firstName: 'Beatriz',
+        lastName: 'Moraes',
+        cpf: '85296374100',
+        phone: '+5511993344556',
+        gender: 'Feminino',
+      });
+      const profile = card(a.customerId, 'Visa', '1881', 'BEATRIZ MORAES');
+      this.paymentProfiles.set(a.customerId, [profile]);
+      const nextBilling = addDays(now, 10);
+      const sub = makeSubscription({
+        customerId: a.customerId,
+        status: 'active',
+        frequency: 'Anual',
+        startedAt: addDays(nextBilling, -30),
+        nextBillingAt: nextBilling,
+        currentCycle: 2,
+        pauseCreditsLeft: 2,
+        remainingCommitmentMonths: 11,
+        items: [{ handle: 'supercoffee-3-0-vanilla-380g', quantity: 1 }],
+        profile,
+        address: address('Beatriz Moraes'),
+      });
+      this.subscriptions.set(a.customerId, sub);
+      const first = makeBill(sub, 1, addDays(nextBilling, -30), 'paid');
+      first.fulfillment = {
+        status: 'delivered',
+        carrier: 'Loggi',
+        trackingCode: 'LG17010BR',
+        events: [
+          {
+            status: 'delivered',
+            description: 'Pedido entregue',
+            occurredAt: iso(addDays(now, -15)),
+          },
+        ],
+      };
+      addBills(a.customerId, [first]);
+    }
+
+    // 11) fim-fidelidade@teste.com — Anual com fidelidade cumprida (remaining 0): pode cancelar
+    //     até o dia anterior à próxima cobrança (em 9 dias).
+    {
+      const a = addAccount({
+        customerId: '7011',
+        email: 'fim-fidelidade@teste.com',
+        firstName: 'Carlos',
+        lastName: 'Mendes',
+        cpf: '74185296300',
+        phone: '+5511994455667',
+        gender: 'Masculino',
+      });
+      const profile = card(a.customerId, 'Mastercard', '4411', 'CARLOS MENDES');
+      this.paymentProfiles.set(a.customerId, [profile]);
+      const nextBilling = addDays(now, 9);
+      const sub = makeSubscription({
+        customerId: a.customerId,
+        status: 'active',
+        frequency: 'Anual',
+        startedAt: addMonths(now, -12),
+        nextBillingAt: nextBilling,
+        currentCycle: 13,
+        pauseCreditsLeft: 1,
+        remainingCommitmentMonths: 0,
+        items: [
+          { handle: 'supercoffee-3-0-original-economic', quantity: 1 },
+          { handle: 'supercoffee-to-go', quantity: 1 },
+        ],
+        profile,
+        address: address('Carlos Mendes'),
+      });
+      this.subscriptions.set(a.customerId, sub);
+      addBills(
+        a.customerId,
+        [12, 11, 10].map((c) => makeBill(sub, c, addDays(nextBilling, -30 * (13 - c)), 'paid')),
+      );
+    }
   }
 }

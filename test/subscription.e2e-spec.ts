@@ -11,7 +11,7 @@ describe('Assinatura: pausa, agendamento, recorrência, cancelamento', () => {
 
   const api = () => request(app.getHttpServer());
 
-  it('pausa permitida muda o estado (ativa@teste.com) e retomar devolve o crédito', async () => {
+  it('pausa permitida muda o estado (ativa@teste.com): 1 crédito por ciclo, fatura R$ 0 por ciclo pausado, retomar devolve os créditos', async () => {
     const { accessToken } = await login(app, 'ativa@teste.com');
     const res = await api()
       .post('/v1/me/subscription/pause')
@@ -19,12 +19,22 @@ describe('Assinatura: pausa, agendamento, recorrência, cancelamento', () => {
       .send({ cycles: 2, reason: 'travel' });
     expect(res.status).toBe(200);
     expect(res.body.status).toBe('paused');
-    expect(res.body.pauseCreditsLeft).toBe(1);
-    expect(res.body.pause).toMatchObject({ cycles: 2, remainingCycles: 2 });
+    expect(res.body.pauseCreditsLeft).toBe(0); // 2 ciclos = 2 créditos
+    expect(res.body.pause).toMatchObject({ cycles: 2, remainingCycles: 2, pauseType: 'User' });
 
     const dash = await api().get('/v1/me/dashboard').set(auth(accessToken));
     expect(dash.body.subscription.status).toBe('paused');
     expect(dash.body.capabilities.canResume.allowed).toBe(true);
+
+    // Durante a pausa cada ciclo pausado tem fatura paga de R$ 0,00 marcada como pausedCycle.
+    const bills = await api().get('/v1/me/bills').set(auth(accessToken));
+    const paused = bills.body.filter((b: any) => b.pausedCycle);
+    expect(paused).toHaveLength(2);
+    for (const b of paused) {
+      expect(b.status).toBe('paid');
+      expect(b.amount.amount).toBe(0);
+      expect(b.items).toEqual([]);
+    }
 
     // pausar de novo não pode
     const again = await api()
@@ -39,6 +49,18 @@ describe('Assinatura: pausa, agendamento, recorrência, cancelamento', () => {
     expect(resumed.body.status).toBe('active');
     expect(resumed.body.pauseCreditsLeft).toBe(2);
     expect(resumed.body.pause).toBeUndefined();
+    const after = await api().get('/v1/me/bills').set(auth(accessToken));
+    expect(after.body.some((b: any) => b.pausedCycle)).toBe(false);
+  });
+
+  it('pausar mais ciclos do que créditos → 422 NOT_ENOUGH_PAUSE_CREDITS (fim-fidelidade tem 1)', async () => {
+    const { accessToken } = await login(app, 'fim-fidelidade@teste.com');
+    const res = await api()
+      .post('/v1/me/subscription/pause')
+      .set(auth(accessToken))
+      .send({ cycles: 2, reason: 'stock' });
+    expect(res.status).toBe(422);
+    expect(res.body.code).toBe('NOT_ENOUGH_PAUSE_CREDITS');
   });
 
   it('mais ciclos que o máximo → 422', async () => {
@@ -50,13 +72,15 @@ describe('Assinatura: pausa, agendamento, recorrência, cancelamento', () => {
     expect(res.status).toBe(400); // DTO limita a 2
   });
 
-  it('pausa negada: Mensal (FREQUENCY_NOT_ELIGIBLE), pendente (frequência), analise (UNDER_REVIEW), pausada', async () => {
+  it('pausa negada: Mensal (FREQUENCY_NOT_ELIGIBLE), pendente (frequência), analise (UNDER_REVIEW), pausada, novata (MIN_PAID_CYCLES), janela (PAUSE_WINDOW_CLOSED)', async () => {
     const cases: Array<[string, string]> = [
       ['mensal@teste.com', 'FREQUENCY_NOT_ELIGIBLE'],
       ['pendente@teste.com', 'FREQUENCY_NOT_ELIGIBLE'],
       ['analise@teste.com', 'UNDER_REVIEW'],
       ['pausada@teste.com', 'SUBSCRIPTION_NOT_ACTIVE'],
       ['cancelada@teste.com', 'SUBSCRIPTION_NOT_ACTIVE'],
+      ['novata@teste.com', 'MIN_PAID_CYCLES'],
+      ['janela@teste.com', 'PAUSE_WINDOW_CLOSED'],
     ];
     for (const [email, reason] of cases) {
       const { accessToken } = await login(app, email);
@@ -66,18 +90,21 @@ describe('Assinatura: pausa, agendamento, recorrência, cancelamento', () => {
         .send({ cycles: 1, reason: 'stock' });
       expect(res.status).toBe(403);
       expect(res.body.code).toBe(reason);
+      if (reason === 'PAUSE_WINDOW_CLOSED') expect(res.body.details.until).toMatch(/-03:00$/);
     }
   });
 
-  it('sem créditos → NO_PAUSE_CREDITS (pausada retoma, pausa, e tenta de novo após zerar)', async () => {
-    // pausada@teste.com tem 1 crédito: retoma (2), pausa (1), retoma (2)... então forçamos via Semestral janela? Usamos agendada (Anual, 2 créditos): pausa/retoma não consome.
-    // Caminho determinístico: consumir créditos pausando e cancelando a pausa não funciona (devolve). Então validamos a regra com a conta cuja pausa está ativa após 1 crédito gasto:
+  it('pausada@teste.com: 2 créditos gastos (1 por ciclo), fatura R$ 0 do ciclo pausado no histórico', async () => {
     const { accessToken } = await login(app, 'pausada@teste.com');
     const dash = await api().get('/v1/me/dashboard').set(auth(accessToken));
-    expect(dash.body.capabilities.canPause.creditsLeft).toBe(1);
+    expect(dash.body.capabilities.canPause.creditsLeft).toBe(0);
+    expect(dash.body.subscription.pause.remainingCycles).toBe(1);
+    const bills = await api().get('/v1/me/bills').set(auth(accessToken));
+    const paused = bills.body.find((b: any) => b.pausedCycle);
+    expect(paused).toMatchObject({ status: 'paid', amount: { amount: 0 } });
   });
 
-  it('agendamento bloqueado na janela D-2 (janela@teste.com) → 403 EDIT_WINDOW_CLOSED com until', async () => {
+  it('agendamento bloqueado na janela D-3 (janela@teste.com) → 403 EDIT_WINDOW_CLOSED com until', async () => {
     const { accessToken } = await login(app, 'janela@teste.com');
     const res = await api()
       .post('/v1/me/subscription/scheduling')
@@ -220,8 +247,32 @@ describe('Assinatura: pausa, agendamento, recorrência, cancelamento', () => {
     expect(bad.status).toBe(422);
   });
 
-  it('cancelar e reativar (agendada@teste.com)', async () => {
+  it('cancelamento travado pela fidelidade (agendada@teste.com, 10 meses restantes) → 403 COMMITMENT_ACTIVE', async () => {
     const { accessToken } = await login(app, 'agendada@teste.com');
+    const dash = await api().get('/v1/me/dashboard').set(auth(accessToken));
+    expect(dash.body.capabilities.canCancel).toMatchObject({
+      allowed: false,
+      reason: 'COMMITMENT_ACTIVE',
+      earlyWindow: true,
+    });
+    expect(dash.body.capabilities.canCancel.remainingCommitmentMonths).toBeGreaterThan(0);
+    expect(dash.body.capabilities.canCancel.commitmentEndsAt).toMatch(/-03:00$/);
+    const res = await api()
+      .post('/v1/me/subscription/cancel')
+      .set(auth(accessToken))
+      .send({ reason: 'price' });
+    expect(res.status).toBe(403);
+    expect(res.body.code).toBe('COMMITMENT_ACTIVE');
+  });
+
+  it('cancelar e reativar (fim-fidelidade@teste.com: fidelidade cumprida, antes da cobrança)', async () => {
+    const { accessToken } = await login(app, 'fim-fidelidade@teste.com');
+    const before = await api().get('/v1/me/dashboard').set(auth(accessToken));
+    expect(before.body.capabilities.canCancel).toMatchObject({
+      allowed: true,
+      remainingCommitmentMonths: 0,
+      earlyWindow: false,
+    });
     const canceled = await api()
       .post('/v1/me/subscription/cancel')
       .set(auth(accessToken))

@@ -49,7 +49,10 @@ export class SubscriptionController {
 
   @Post('subscription/scheduling')
   @HttpCode(201)
-  @ApiOperation({ summary: 'Agenda mudança de itens/plano (403 EDIT_WINDOW_CLOSED na janela D-2)' })
+  @ApiOperation({
+    summary:
+      'Agenda mudança de itens/plano (403 EDIT_WINDOW_CLOSED na janela D-3; outra frequency cria assinatura nova → id muda)',
+  })
   @ApiOkType(ScheduledChangeSchema)
   scheduling(@CurrentCustomer() c: AuthenticatedCustomer, @Body() dto: SchedulingDto) {
     return this.service.createScheduling(c.customerId, dto);

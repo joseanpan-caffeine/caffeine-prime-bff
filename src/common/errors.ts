@@ -47,13 +47,20 @@ export class AppError extends HttpException {
 }
 
 export const CAPABILITY_MESSAGES: Record<CapabilityReason, string> = {
-  EDIT_WINDOW_CLOSED: 'Edições ficam bloqueadas nos 2 dias anteriores à cobrança.',
+  EDIT_WINDOW_CLOSED: 'Edições ficam bloqueadas a partir de 3 dias antes da cobrança.',
   SUBSCRIPTION_NOT_ACTIVE: 'A assinatura não está ativa.',
   FREQUENCY_NOT_ELIGIBLE: 'Apenas planos Semestral e Anual podem ser pausados.',
   NO_PAUSE_CREDITS: 'Você não tem mais créditos de pausa neste período.',
+  MIN_PAID_CYCLES: 'A pausa fica disponível a partir da 4ª cobrança paga.',
+  PAUSE_WINDOW_CLOSED: 'O pedido de pausa só pode ser feito até 3 dias antes da cobrança.',
+  RESUME_WINDOW_CLOSED: 'Só é possível desfazer a pausa até 5 dias antes da cobrança.',
   PENDING_BILL: 'Há uma fatura pendente. Pague-a para liberar esta ação.',
   NOT_PAUSED: 'A assinatura não está pausada.',
   NOT_CANCELED: 'A assinatura não está cancelada.',
   CANCELLATION_BLOCKED: 'O cancelamento está bloqueado para esta assinatura.',
+  COMMITMENT_ACTIVE:
+    'Sua fidelidade ainda está em vigor; o cancelamento fica disponível depois do último pagamento.',
+  CANCEL_WINDOW_CLOSED:
+    'A janela de cancelamento fechou: hoje é o dia da cobrança. Sem cancelar, a assinatura renova.',
   UNDER_REVIEW: 'A assinatura está em análise; nenhuma ação disponível.',
 };

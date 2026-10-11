@@ -169,7 +169,17 @@ export class SubscriptionService {
         `Máximo de ${caps.canPause.maxCycles} ciclos por pausa.`,
       );
     }
-    return toPublicSubscription(await this.subscriptions.pause(sub.id, request, this.clock.now()));
+    // Cada ciclo pausado consome exatamente 1 crédito (docs/contexto-prime.md §6.2).
+    if (request.cycles > sub.pauseCreditsLeft) {
+      throw AppError.unprocessable(
+        'NOT_ENOUGH_PAUSE_CREDITS',
+        `Você tem ${sub.pauseCreditsLeft} crédito(s) de pausa; cada ciclo pausado usa 1.`,
+      );
+    }
+    // A rota pública sempre cria pausa `User`; a pausa `Offer` (retenção) não passa pelo app.
+    return toPublicSubscription(
+      await this.subscriptions.pause(sub.id, request, this.clock.now(), 'User'),
+    );
   }
 
   async resume(customerId: string): Promise<Subscription> {
